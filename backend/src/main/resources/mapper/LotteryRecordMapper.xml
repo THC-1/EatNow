@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.lottery.mapper.LotteryRecordMapper">
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM lottery_record
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="selectByUserId" resultType="com.eatnow.backend.lottery.vo.LotteryRecordVo">
+        SELECT
+            id,
+            user_id AS userId,
+            draw_mode AS drawMode,
+            source_type AS sourceType,
+            source_id AS sourceId,
+            snapshot_title AS title,
+            snapshot_price AS price,
+            snapshot_score AS score,
+            result_action AS resultAction,
+            created_at AS createdAt
+        FROM lottery_record
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+</mapper>

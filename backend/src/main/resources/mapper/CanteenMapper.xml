@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.campus.mapper.CanteenMapper">
+
+    <select id="selectCanteenList" resultType="com.eatnow.backend.campus.vo.CanteenListVo">
+        SELECT
+            c.id,
+            c.campus_id AS campusId,
+            c.name,
+            c.type,
+            c.location,
+            c.description,
+            c.opening_hours AS openingHours,
+            c.status,
+            c.average_score AS averageScore
+        FROM canteen c
+        WHERE c.status = #{status}
+        <if test="campusId != null">
+            AND c.campus_id = #{campusId}
+        </if>
+        <if test="type != null and type != ''">
+            AND c.type = #{type}
+        </if>
+        ORDER BY c.sort_order ASC, c.id ASC
+    </select>
+
+    <select id="selectCanteenDetail" resultType="com.eatnow.backend.campus.vo.CanteenDetailVo">
+        SELECT
+            c.id,
+            c.campus_id AS campusId,
+            c.name,
+            c.type,
+            c.location,
+            c.description,
+            c.opening_hours AS openingHours,
+            c.status,
+            c.average_score AS averageScore,
+            (
+                SELECT COUNT(1)
+                FROM stall s
+                WHERE s.canteen_id = c.id
+                  AND s.status = #{status}
+            ) AS stallCount
+        FROM canteen c
+        WHERE c.id = #{id}
+          AND c.status = #{status}
+        LIMIT 1
+    </select>
+</mapper>

@@ -1,17 +1,102 @@
 {
-	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
-		{
-			"path": "pages/index/index",
-			"style": {
-				"navigationBarTitleText": "uni-app"
-			}
-		}
-	],
-	"globalStyle": {
-		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "uni-app",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
-	},
-	"uniIdRouter": {}
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "饭点盲盒",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/canteens/index",
+      "style": {
+        "navigationBarTitleText": "食堂"
+      }
+    },
+    {
+      "path": "pages/dishes/index",
+      "style": {
+        "navigationBarTitleText": "菜品"
+      }
+    },
+    {
+      "path": "pages/dish-detail/index",
+      "style": {
+        "navigationBarTitleText": "菜品详情"
+      }
+    },
+    {
+      "path": "pages/lottery/index",
+      "style": {
+        "navigationBarTitleText": "今天吃什么"
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/merchant/index/index",
+      "style": {
+        "navigationBarTitleText": "卖家工作台"
+      }
+    },
+    {
+      "path": "pages/merchant/apply/index",
+      "style": {
+        "navigationBarTitleText": "商家入驻"
+      }
+    },
+    {
+      "path": "pages/merchant/dishes/index",
+      "style": {
+        "navigationBarTitleText": "菜品管理"
+      }
+    },
+    {
+      "path": "pages/merchant/recommendations/index",
+      "style": {
+        "navigationBarTitleText": "推荐管理"
+      }
+    },
+    {
+      "path": "pages/merchant/feedback/index",
+      "style": {
+        "navigationBarTitleText": "留言反馈"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "饭点盲盒",
+    "navigationBarBackgroundColor": "#FFF7EA",
+    "backgroundColor": "#FFF7EA"
+  },
+  "tabBar": {
+    "color": "#8A7A68",
+    "selectedColor": "#E94B35",
+    "backgroundColor": "#FFFDF7",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/canteens/index",
+        "text": "食堂"
+      },
+      {
+        "pagePath": "pages/lottery/index",
+        "text": "抽签"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "uniIdRouter": {}
 }

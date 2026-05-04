@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.feedback.mapper.FeedbackMapper">
+
+    <sql id="VisibleDishJoin">
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        WHERE d.id = #{dishId}
+          AND d.status IN ('ON_SALE', 'SOLD_OUT')
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+    </sql>
+
+    <select id="selectVisibleDishTarget" resultType="com.eatnow.backend.feedback.vo.FeedbackTargetRelationVo">
+        SELECT
+            d.id AS dishId,
+            d.merchant_id AS merchantId,
+            d.name AS dishName
+        <include refid="VisibleDishJoin"/>
+        LIMIT 1
+    </select>
+
+    <select id="countMerchantFeedback" resultType="long">
+        SELECT COUNT(1)
+        FROM feedback f
+        WHERE f.merchant_id = #{merchantId}
+        <if test="dishId != null">
+            AND f.dish_id = #{dishId}
+        </if>
+        <if test="feedbackType != null and feedbackType != ''">
+            AND f.feedback_type = #{feedbackType}
+        </if>
+        <if test="status != null and status != ''">
+            AND f.status = #{status}
+        </if>
+    </select>
+
+    <select id="selectMerchantFeedbackList" resultType="com.eatnow.backend.feedback.vo.FeedbackItemVo">
+        SELECT
+            f.id,
+            f.user_id AS userId,
+            su.nickname AS userNickname,
+            f.target_type AS targetType,
+            f.dish_id AS targetId,
+            f.dish_id AS dishId,
+            d.name AS dishName,
+            f.feedback_type AS feedbackType,
+            f.content,
+            f.status,
+            f.reply_content AS replyContent,
+            f.replied_by AS repliedBy,
+            f.replied_at AS repliedAt,
+            f.created_at AS createdAt
+        FROM feedback f
+        INNER JOIN sys_user su ON su.id = f.user_id
+        INNER JOIN dish d ON d.id = f.dish_id
+        WHERE f.merchant_id = #{merchantId}
+        <if test="dishId != null">
+            AND f.dish_id = #{dishId}
+        </if>
+        <if test="feedbackType != null and feedbackType != ''">
+            AND f.feedback_type = #{feedbackType}
+        </if>
+        <if test="status != null and status != ''">
+            AND f.status = #{status}
+        </if>
+        ORDER BY f.created_at DESC, f.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+</mapper>

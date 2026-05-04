@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.feedback.mapper.MerchantImprovementRecordMapper">
+
+    <select id="countMerchantImprovementRecords" resultType="long">
+        SELECT COUNT(1)
+        FROM merchant_improvement_record mir
+        WHERE mir.merchant_id = #{merchantId}
+        <if test="dishId != null">
+            AND mir.dish_id = #{dishId}
+        </if>
+        <if test="feedbackId != null">
+            AND mir.feedback_id = #{feedbackId}
+        </if>
+        <if test="status != null and status != ''">
+            AND mir.status = #{status}
+        </if>
+    </select>
+
+    <select id="selectMerchantImprovementRecords" resultType="com.eatnow.backend.feedback.vo.MerchantImprovementItemVo">
+        SELECT
+            mir.id,
+            mir.dish_id AS dishId,
+            d.name AS dishName,
+            mir.feedback_id AS feedbackId,
+            f.content AS feedbackContent,
+            mir.title,
+            mir.content,
+            mir.before_description AS beforeDescription,
+            mir.after_description AS afterDescription,
+            mir.status,
+            mir.is_public AS isPublic,
+            mir.created_at AS createdAt
+        FROM merchant_improvement_record mir
+        LEFT JOIN dish d ON d.id = mir.dish_id
+        LEFT JOIN feedback f ON f.id = mir.feedback_id
+        WHERE mir.merchant_id = #{merchantId}
+        <if test="dishId != null">
+            AND mir.dish_id = #{dishId}
+        </if>
+        <if test="feedbackId != null">
+            AND mir.feedback_id = #{feedbackId}
+        </if>
+        <if test="status != null and status != ''">
+            AND mir.status = #{status}
+        </if>
+        ORDER BY mir.created_at DESC, mir.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+</mapper>

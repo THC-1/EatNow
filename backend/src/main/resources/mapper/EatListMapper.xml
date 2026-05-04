@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.eatlist.mapper.EatListMapper">
+
+    <select id="countEatList" resultType="long">
+        SELECT COUNT(1)
+        FROM eat_list
+        WHERE user_id = #{userId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+    </select>
+
+    <select id="selectEatList" resultType="com.eatnow.backend.eatlist.vo.EatListItemVo">
+        SELECT
+            id,
+            user_id AS userId,
+            dish_id AS dishId,
+            status,
+            source_lottery_record_id AS sourceLotteryRecordId,
+            note,
+            created_at AS createdAt,
+            eaten_at AS eatenAt,
+            updated_at AS updatedAt
+        FROM eat_list
+        WHERE user_id = #{userId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectDishRelations" resultType="com.eatnow.backend.eatlist.vo.EatListDishRelationVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            d.price,
+            d.average_score AS score,
+            m.name AS merchantName,
+            c.name AS canteenName,
+            di.image_url AS imageUrl
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        LEFT JOIN dish_image di ON di.dish_id = d.id
+        WHERE d.id IN
+        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
+            #{dishId}
+        </foreach>
+        ORDER BY d.id ASC, di.is_cover DESC, di.sort_order ASC, di.id ASC
+    </select>
+
+    <select id="countVisibleDishById" resultType="int">
+        SELECT COUNT(1)
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        WHERE d.id = #{id}
+          AND d.status IN ('ON_SALE', 'SOLD_OUT')
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+    </select>
+</mapper>

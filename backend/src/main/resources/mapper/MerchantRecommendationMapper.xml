@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.merchantrecommendation.mapper.MerchantRecommendationMapper">
+
+    <select id="countMerchantRecommendations" resultType="long">
+        SELECT COUNT(1)
+        FROM merchant_recommendation mr
+        WHERE mr.merchant_id = #{merchantId}
+        <if test="recommendType != null and recommendType != ''">
+            AND mr.recommend_type = #{recommendType}
+        </if>
+        <if test="status != null and status != ''">
+            AND mr.status = #{status}
+        </if>
+    </select>
+
+    <select id="selectMerchantRecommendations" resultType="com.eatnow.backend.merchantrecommendation.vo.MerchantRecommendationItemVo">
+        SELECT
+            mr.id,
+            mr.merchant_id AS merchantId,
+            mr.dish_id AS dishId,
+            d.name AS dishName,
+            mr.title,
+            mr.recommend_reason AS recommendReason,
+            mr.recommend_type AS recommendType,
+            mr.start_time AS startTime,
+            mr.end_time AS endTime,
+            mr.status,
+            mr.is_top AS isTop,
+            mr.click_count AS clickCount,
+            mr.created_at AS createdAt
+        FROM merchant_recommendation mr
+        INNER JOIN dish d ON d.id = mr.dish_id
+        WHERE mr.merchant_id = #{merchantId}
+        <if test="recommendType != null and recommendType != ''">
+            AND mr.recommend_type = #{recommendType}
+        </if>
+        <if test="status != null and status != ''">
+            AND mr.status = #{status}
+        </if>
+        ORDER BY mr.is_top DESC, mr.created_at DESC, mr.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectPublicDishRecommendations" resultType="com.eatnow.backend.merchantrecommendation.vo.DishRecommendationVo">
+        SELECT
+            mr.id,
+            mr.merchant_id AS merchantId,
+            m.name AS merchantName,
+            mr.dish_id AS dishId,
+            d.name AS dishName,
+            mr.title,
+            mr.recommend_reason AS recommendReason,
+            mr.recommend_type AS recommendType,
+            d.price,
+            d.average_score AS score,
+            d.cover_image_url AS coverImageUrl,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            s.name AS stallName,
+            mr.is_top AS isTop,
+            mr.start_time AS startTime,
+            mr.end_time AS endTime
+        FROM merchant_recommendation mr
+        INNER JOIN dish d ON d.id = mr.dish_id
+        INNER JOIN merchant m ON m.id = mr.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        WHERE mr.merchant_id = #{merchantId}
+          AND mr.status = 'ACTIVE'
+          AND mr.start_time <![CDATA[<=]]> NOW()
+          AND mr.end_time <![CDATA[>=]]> NOW()
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND d.status IN ('ON_SALE', 'SOLD_OUT')
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+        <if test="recommendType != null and recommendType != ''">
+            AND mr.recommend_type = #{recommendType}
+        </if>
+        ORDER BY mr.is_top DESC, mr.start_time DESC, mr.id DESC
+    </select>
+</mapper>

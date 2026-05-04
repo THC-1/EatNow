@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.admin.mapper.AdminMapper">
+
+    <sql id="UserListQuery">
+        SELECT
+            u.id,
+            u.username,
+            u.nickname,
+            u.avatar_url AS avatar,
+            CASE
+                WHEN SUM(CASE WHEN r.role_code = 'MERCHANT' THEN 1 ELSE 0 END) &gt; 0 THEN 'MERCHANT'
+                ELSE 'STUDENT'
+            END AS userRole,
+            u.status,
+            u.created_at AS createdAt
+        FROM sys_user u
+        INNER JOIN sys_user_role ur ON ur.user_id = u.id
+        INNER JOIN sys_role r ON r.id = ur.role_id
+        WHERE r.role_code IN ('STUDENT', 'MERCHANT')
+        <if test="status != null and status != ''">
+            AND u.status = #{status}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                u.username LIKE CONCAT('%', #{keyword}, '%')
+                OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                OR u.phone LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        GROUP BY u.id, u.username, u.nickname, u.avatar_url, u.status, u.created_at
+        <if test="role != null and role != ''">
+            HAVING userRole = #{role}
+        </if>
+    </sql>
+
+    <select id="countAdminUserList" resultType="long">
+        SELECT COUNT(1)
+        FROM (
+            <include refid="UserListQuery"/>
+        ) user_list
+    </select>
+
+    <select id="selectAdminUserList" resultType="com.eatnow.backend.admin.vo.AdminUserListItemVo">
+        SELECT
+            id,
+            username,
+            nickname,
+            avatar,
+            userRole AS role,
+            status,
+            createdAt
+        FROM (
+            <include refid="UserListQuery"/>
+        ) user_list
+        ORDER BY createdAt DESC, id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectAdminUserDetail" resultType="com.eatnow.backend.admin.vo.AdminUserDetailVo">
+        SELECT
+            u.id,
+            u.username,
+            u.nickname,
+            u.avatar_url AS avatar,
+            u.phone,
+            u.gender,
+            u.status,
+            u.last_login_at AS lastLoginAt,
+            u.created_at AS createdAt,
+            u.updated_at AS updatedAt
+        FROM sys_user u
+        WHERE u.id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectStudentProfile" resultType="com.eatnow.backend.admin.vo.AdminStudentProfileVo">
+        SELECT
+            campus_id AS campusId,
+            student_no AS studentNo,
+            grade,
+            major,
+            bio
+        FROM student_profile
+        WHERE user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <select id="selectMerchantProfile" resultType="com.eatnow.backend.admin.vo.AdminMerchantProfileVo">
+        SELECT
+            m.id AS merchantId,
+            m.name AS merchantName,
+            m.stall_id AS stallId,
+            s.name AS stallName,
+            c.id AS canteenId,
+            c.name AS canteenName,
+            m.apply_status AS applyStatus,
+            m.status AS merchantStatus,
+            m.reject_reason AS rejectReason,
+            m.description,
+            m.approved_at AS approvedAt
+        FROM merchant m
+        LEFT JOIN stall s ON s.id = m.stall_id
+        LEFT JOIN canteen c ON c.id = s.canteen_id
+        WHERE m.user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <select id="countMerchantApplications" resultType="long">
+        SELECT COUNT(1)
+        FROM merchant m
+        WHERE 1 = 1
+        <if test="applyStatus != null and applyStatus != ''">
+            AND m.apply_status = #{applyStatus}
+        </if>
+    </select>
+
+    <select id="selectMerchantApplications" resultType="com.eatnow.backend.admin.vo.AdminMerchantApplicationItemVo">
+        SELECT
+            m.id AS merchantId,
+            m.user_id AS userId,
+            m.name AS merchantName,
+            m.stall_id AS stallId,
+            s.name AS stallName,
+            c.id AS canteenId,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            m.description,
+            m.apply_status AS applyStatus,
+            m.reject_reason AS rejectReason,
+            m.created_at AS createdAt
+        FROM merchant m
+        LEFT JOIN stall s ON s.id = m.stall_id
+        LEFT JOIN canteen c ON c.id = s.canteen_id
+        WHERE 1 = 1
+        <if test="applyStatus != null and applyStatus != ''">
+            AND m.apply_status = #{applyStatus}
+        </if>
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <sql id="AdminReviewQuery">
+        SELECT
+            r.id,
+            r.user_id AS userId,
+            CASE
+                WHEN r.is_anonymous = 1 THEN '匿名用户'
+                ELSE su.nickname
+            END AS userNickname,
+            CASE
+                WHEN r.is_anonymous = 1 THEN NULL
+                ELSE su.avatar_url
+            END AS userAvatar,
+            r.target_type AS targetType,
+            r.dish_id AS targetId,
+            r.dish_id AS dishId,
+            d.name AS dishName,
+            m.name AS merchantName,
+            r.overall_score AS overallScore,
+            r.content,
+            r.is_anonymous AS isAnonymous,
+            r.like_count AS likeCount,
+            r.status,
+            r.created_at AS createdAt
+        FROM review r
+        INNER JOIN sys_user su ON su.id = r.user_id
+        INNER JOIN dish d ON d.id = r.dish_id
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        WHERE 1 = 1
+        <if test="targetType != null and targetType != ''">
+            AND r.target_type = #{targetType}
+        </if>
+        <if test="status != null and status != ''">
+            AND r.status = #{status}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                r.content LIKE CONCAT('%', #{keyword}, '%')
+                OR d.name LIKE CONCAT('%', #{keyword}, '%')
+                OR su.nickname LIKE CONCAT('%', #{keyword}, '%')
+                OR m.name LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <select id="countAdminReviewList" resultType="long">
+        SELECT COUNT(1)
+        FROM (
+            <include refid="AdminReviewQuery"/>
+        ) review_list
+    </select>
+
+    <select id="selectAdminReviewList" resultType="com.eatnow.backend.admin.vo.AdminReviewItemVo">
+        <include refid="AdminReviewQuery"/>
+        ORDER BY createdAt DESC, id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countCampusById" resultType="long">
+        SELECT COUNT(1)
+        FROM campus
+        WHERE id = #{id}
+    </select>
+
+    <select id="countStallsByCanteenId" resultType="long">
+        SELECT COUNT(1)
+        FROM stall
+        WHERE canteen_id = #{canteenId}
+    </select>
+
+    <select id="countMerchantByStallId" resultType="long">
+        SELECT COUNT(1)
+        FROM merchant
+        WHERE stall_id = #{stallId}
+    </select>
+
+    <select id="countDishByStallId" resultType="long">
+        SELECT COUNT(1)
+        FROM dish
+        WHERE stall_id = #{stallId}
+    </select>
+
+    <sql id="AdminDishQuery">
+        SELECT
+            d.id,
+            d.merchant_id AS merchantId,
+            m.name AS merchantName,
+            d.canteen_id AS canteenId,
+            c.name AS canteenName,
+            d.stall_id AS stallId,
+            s.name AS stallName,
+            d.category_id AS categoryId,
+            cg.name AS categoryName,
+            d.name,
+            d.price,
+            d.cover_image_url AS coverImageUrl,
+            d.average_score AS averageScore,
+            d.status,
+            d.is_join_lottery AS isJoinLottery,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS reviewCount,
+            d.created_at AS createdAt
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        LEFT JOIN category cg ON cg.id = d.category_id
+        WHERE 1 = 1
+        <if test="merchantId != null">
+            AND d.merchant_id = #{merchantId}
+        </if>
+        <if test="canteenId != null">
+            AND d.canteen_id = #{canteenId}
+        </if>
+        <if test="stallId != null">
+            AND d.stall_id = #{stallId}
+        </if>
+        <if test="status != null and status != ''">
+            AND d.status = #{status}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                d.name LIKE CONCAT('%', #{keyword}, '%')
+                OR m.name LIKE CONCAT('%', #{keyword}, '%')
+                OR c.name LIKE CONCAT('%', #{keyword}, '%')
+                OR s.name LIKE CONCAT('%', #{keyword}, '%')
+                OR cg.name LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <select id="countAdminDishList" resultType="long">
+        SELECT COUNT(1)
+        FROM (
+            <include refid="AdminDishQuery"/>
+        ) dish_list
+    </select>
+
+    <select id="selectAdminDishList" resultType="com.eatnow.backend.admin.vo.AdminDishItemVo">
+        <include refid="AdminDishQuery"/>
+        ORDER BY createdAt DESC, id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectAdminDishDetail" resultType="com.eatnow.backend.admin.vo.AdminDishDetailVo">
+        SELECT
+            d.id,
+            d.merchant_id AS merchantId,
+            m.name AS merchantName,
+            m.status AS merchantStatus,
+            m.apply_status AS merchantApplyStatus,
+            d.canteen_id AS canteenId,
+            c.name AS canteenName,
+            d.stall_id AS stallId,
+            s.name AS stallName,
+            d.category_id AS categoryId,
+            cg.name AS categoryName,
+            d.name,
+            d.description,
+            d.price,
+            d.cover_image_url AS coverImageUrl,
+            d.average_score AS averageScore,
+            d.taste_score AS tasteScore,
+            d.portion_score AS portionScore,
+            d.value_score AS valueScore,
+            d.status,
+            d.is_join_lottery AS isJoinLottery,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS reviewCount,
+            d.created_at AS createdAt,
+            d.updated_at AS updatedAt
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        LEFT JOIN category cg ON cg.id = d.category_id
+        WHERE d.id = #{id}
+        LIMIT 1
+    </select>
+
+    <insert id="upsertDishLotteryPool">
+        INSERT INTO lottery_pool (
+            source_type,
+            source_id,
+            merchant_id,
+            canteen_id,
+            stall_id,
+            category_id,
+            title,
+            price,
+            score,
+            cover_image_url,
+            recommend_reason,
+            weight,
+            status
+        )
+        SELECT
+            'DISH',
+            d.id,
+            d.merchant_id,
+            d.canteen_id,
+            d.stall_id,
+            d.category_id,
+            d.name,
+            d.price,
+            d.average_score,
+            d.cover_image_url,
+            NULL,
+            100,
+            CASE
+                WHEN d.is_join_lottery = 1 AND d.status IN ('ON_SALE', 'SOLD_OUT') THEN 'ACTIVE'
+                ELSE 'INACTIVE'
+            END
+        FROM dish d
+        WHERE d.id = #{dishId}
+        ON DUPLICATE KEY UPDATE
+            merchant_id = VALUES(merchant_id),
+            canteen_id = VALUES(canteen_id),
+            stall_id = VALUES(stall_id),
+            category_id = VALUES(category_id),
+            title = VALUES(title),
+            price = VALUES(price),
+            score = VALUES(score),
+            cover_image_url = VALUES(cover_image_url),
+            status = VALUES(status),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="updateDishLotteryPoolStatus">
+        UPDATE lottery_pool
+        SET status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE source_type = 'DISH'
+          AND source_id = #{dishId}
+    </update>
+
+    <select id="selectStatisticsOverview" resultType="com.eatnow.backend.admin.vo.AdminStatisticsOverviewVo">
+        SELECT
+            (
+                SELECT COUNT(DISTINCT ur.user_id)
+                FROM sys_user_role ur
+                INNER JOIN sys_role r ON r.id = ur.role_id
+                INNER JOIN sys_user u ON u.id = ur.user_id
+                WHERE r.role_code = 'STUDENT'
+                  AND u.status = 'ACTIVE'
+            ) AS studentCount,
+            (
+                SELECT COUNT(1)
+                FROM merchant m
+                INNER JOIN sys_user u ON u.id = m.user_id
+                WHERE m.apply_status = 'APPROVED'
+                  AND m.status != 'DISABLED'
+                  AND u.status = 'ACTIVE'
+            ) AS merchantCount,
+            (
+                SELECT COUNT(1)
+                FROM dish
+            ) AS dishCount,
+            (
+                SELECT COUNT(1)
+                FROM review
+                WHERE status = 'VISIBLE'
+            ) AS reviewCount,
+            (
+                SELECT COUNT(1)
+                FROM lottery_record
+                WHERE created_at &gt;= CURDATE()
+                  AND created_at &lt; DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+            ) AS todayLotteryCount,
+            (
+                SELECT COUNT(DISTINCT user_id)
+                FROM user_activity_log
+                WHERE occurred_at &gt;= CURDATE()
+                  AND occurred_at &lt; DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+            ) AS todayActiveUsers
+    </select>
+
+    <select id="selectPopularDishes" resultType="com.eatnow.backend.admin.vo.AdminPopularDishVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            m.name AS merchantName,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS reviewCount,
+            d.average_score AS averageScore
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        WHERE d.status IN ('ON_SALE', 'SOLD_OUT')
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+        ORDER BY (d.view_count + d.favorite_count * 3 + d.review_count * 2) DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectPopularMerchants" resultType="com.eatnow.backend.admin.vo.AdminPopularMerchantVo">
+        SELECT
+            m.id AS merchantId,
+            m.name AS merchantName,
+            c.name AS canteenName,
+            COUNT(DISTINCT CASE WHEN d.status IN ('ON_SALE', 'SOLD_OUT') THEN d.id END) AS dishCount,
+            COALESCE(SUM(CASE WHEN d.status IN ('ON_SALE', 'SOLD_OUT') THEN d.view_count ELSE 0 END), 0) AS viewCount,
+            COALESCE(SUM(CASE WHEN d.status IN ('ON_SALE', 'SOLD_OUT') THEN d.favorite_count ELSE 0 END), 0) AS favoriteCount,
+            COALESCE(SUM(CASE WHEN d.status IN ('ON_SALE', 'SOLD_OUT') THEN d.review_count ELSE 0 END), 0) AS reviewCount,
+            m.average_score AS averageScore
+        FROM merchant m
+        INNER JOIN stall s ON s.id = m.stall_id
+        INNER JOIN canteen c ON c.id = s.canteen_id
+        LEFT JOIN dish d ON d.merchant_id = m.id
+        WHERE m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+        GROUP BY m.id, m.name, c.name, m.average_score
+        ORDER BY (viewCount + favoriteCount * 3 + reviewCount * 2) DESC, merchantId DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectUserActivity" resultType="com.eatnow.backend.admin.vo.AdminUserActivityVo">
+        SELECT
+            dates.activity_date AS date,
+            COALESCE(activity.activeUsers, 0) AS activeUsers,
+            COALESCE(lottery.lotteryCount, 0) AS lotteryCount,
+            COALESCE(review.reviewCount, 0) AS reviewCount
+        FROM (
+            SELECT DATE(occurred_at) AS activity_date
+            FROM user_activity_log
+            WHERE occurred_at &gt;= #{startTime}
+              AND occurred_at &lt; #{endTime}
+            UNION
+            SELECT DATE(created_at) AS activity_date
+            FROM lottery_record
+            WHERE created_at &gt;= #{startTime}
+              AND created_at &lt; #{endTime}
+            UNION
+            SELECT DATE(created_at) AS activity_date
+            FROM review
+            WHERE created_at &gt;= #{startTime}
+              AND created_at &lt; #{endTime}
+        ) dates
+        LEFT JOIN (
+            SELECT
+                DATE(occurred_at) AS activity_date,
+                COUNT(DISTINCT user_id) AS activeUsers
+            FROM user_activity_log
+            WHERE occurred_at &gt;= #{startTime}
+              AND occurred_at &lt; #{endTime}
+            GROUP BY DATE(occurred_at)
+        ) activity ON activity.activity_date = dates.activity_date
+        LEFT JOIN (
+            SELECT
+                DATE(created_at) AS activity_date,
+                COUNT(1) AS lotteryCount
+            FROM lottery_record
+            WHERE created_at &gt;= #{startTime}
+              AND created_at &lt; #{endTime}
+            GROUP BY DATE(created_at)
+        ) lottery ON lottery.activity_date = dates.activity_date
+        LEFT JOIN (
+            SELECT
+                DATE(created_at) AS activity_date,
+                COUNT(1) AS reviewCount
+            FROM review
+            WHERE created_at &gt;= #{startTime}
+              AND created_at &lt; #{endTime}
+              AND status != 'DELETED'
+            GROUP BY DATE(created_at)
+        ) review ON review.activity_date = dates.activity_date
+        ORDER BY dates.activity_date ASC
+    </select>
+
+    <select id="selectCanteenScores" resultType="com.eatnow.backend.admin.vo.AdminCanteenScoreVo">
+        SELECT
+            c.id AS canteenId,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            c.average_score AS averageScore,
+            COUNT(DISTINCT CASE WHEN r.status = 'VISIBLE' THEN r.id END) AS reviewCount,
+            COUNT(DISTINCT CASE WHEN d.status != 'OFF_SHELF' THEN d.id END) AS dishCount
+        FROM canteen c
+        LEFT JOIN dish d ON d.canteen_id = c.id
+        LEFT JOIN review r ON r.dish_id = d.id
+        WHERE c.status != 'DISABLED'
+        GROUP BY c.id, c.name, c.type, c.average_score
+        ORDER BY c.average_score DESC, c.id ASC
+    </select>
+</mapper>

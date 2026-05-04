@@ -2,4 +2,182 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.eatnow.backend.review.mapper.ReviewMapper">
 
+    <sql id="VisibleDishJoin">
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        WHERE d.id = #{id}
+          AND d.status IN ('ON_SALE', 'SOLD_OUT')
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+    </sql>
+
+    <select id="countVisibleDishById" resultType="int">
+        SELECT COUNT(1)
+        <include refid="VisibleDishJoin"/>
+    </select>
+
+    <select id="selectMerchantIdByDishId" resultType="long">
+        SELECT merchant_id
+        FROM dish
+        WHERE id = #{dishId}
+        LIMIT 1
+    </select>
+
+    <select id="countReviewList" resultType="long">
+        SELECT COUNT(1)
+        FROM review r
+        WHERE r.dish_id = #{dishId}
+          AND r.status = #{status}
+    </select>
+
+    <select id="selectReviewList" resultType="com.eatnow.backend.review.vo.ReviewItemVo">
+        SELECT
+            r.id,
+            r.user_id AS userId,
+            su.nickname AS userNickname,
+            su.avatar_url AS userAvatar,
+            r.target_type AS targetType,
+            r.dish_id AS targetId,
+            r.dish_id AS dishId,
+            d.name AS dishName,
+            r.overall_score AS overallScore,
+            r.taste_score AS tasteScore,
+            r.portion_score AS portionScore,
+            r.value_score AS valueScore,
+            r.content,
+            r.is_anonymous AS isAnonymous,
+            r.like_count AS likeCount,
+            r.created_at AS createdAt
+        FROM review r
+        INNER JOIN sys_user su ON su.id = r.user_id
+        INNER JOIN dish d ON d.id = r.dish_id
+        WHERE r.dish_id = #{dishId}
+          AND r.status = #{status}
+        <choose>
+            <when test="sortBy == 'highest'">
+                ORDER BY r.overall_score DESC, r.id DESC
+            </when>
+            <when test="sortBy == 'lowest'">
+                ORDER BY r.overall_score ASC, r.id DESC
+            </when>
+            <otherwise>
+                ORDER BY r.created_at DESC, r.id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countMyReviewList" resultType="long">
+        SELECT COUNT(1)
+        FROM review
+        WHERE user_id = #{userId}
+          AND status != 'DELETED'
+    </select>
+
+    <select id="selectMyReviewList" resultType="com.eatnow.backend.review.vo.ReviewItemVo">
+        SELECT
+            r.id,
+            r.user_id AS userId,
+            su.nickname AS userNickname,
+            su.avatar_url AS userAvatar,
+            r.target_type AS targetType,
+            r.dish_id AS targetId,
+            r.dish_id AS dishId,
+            d.name AS dishName,
+            r.overall_score AS overallScore,
+            r.taste_score AS tasteScore,
+            r.portion_score AS portionScore,
+            r.value_score AS valueScore,
+            r.content,
+            r.is_anonymous AS isAnonymous,
+            r.like_count AS likeCount,
+            r.created_at AS createdAt
+        FROM review r
+        INNER JOIN sys_user su ON su.id = r.user_id
+        INNER JOIN dish d ON d.id = r.dish_id
+        WHERE r.user_id = #{userId}
+          AND r.status != 'DELETED'
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectReviewImages" resultType="com.eatnow.backend.review.vo.ReviewImageRelationVo">
+        SELECT
+            review_id AS reviewId,
+            image_url AS imageUrl
+        FROM review_image
+        WHERE review_id IN
+        <foreach collection="reviewIds" item="reviewId" open="(" separator="," close=")">
+            #{reviewId}
+        </foreach>
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="selectLikedReviewIds" resultType="long">
+        SELECT review_id
+        FROM review_like
+        WHERE user_id = #{userId}
+          AND review_id IN
+        <foreach collection="reviewIds" item="reviewId" open="(" separator="," close=")">
+            #{reviewId}
+        </foreach>
+    </select>
+
+    <select id="selectDishReviewAggregate" resultType="com.eatnow.backend.review.vo.ReviewAggregateVo">
+        SELECT
+            COUNT(1) AS reviewCount,
+            COALESCE(ROUND(AVG(overall_score), 2), 0) AS averageScore,
+            COALESCE(ROUND(AVG(taste_score), 2), 0) AS tasteScore,
+            COALESCE(ROUND(AVG(portion_score), 2), 0) AS portionScore,
+            COALESCE(ROUND(AVG(value_score), 2), 0) AS valueScore
+        FROM review
+        WHERE dish_id = #{dishId}
+          AND status = 'VISIBLE'
+    </select>
+
+    <select id="selectMerchantReviewAggregate" resultType="com.eatnow.backend.review.vo.ReviewAggregateVo">
+        SELECT
+            COUNT(1) AS reviewCount,
+            COALESCE(ROUND(AVG(r.overall_score), 2), 0) AS averageScore,
+            COALESCE(ROUND(AVG(r.taste_score), 2), 0) AS tasteScore,
+            COALESCE(ROUND(AVG(r.portion_score), 2), 0) AS portionScore,
+            COALESCE(ROUND(AVG(r.value_score), 2), 0) AS valueScore
+        FROM review r
+        INNER JOIN dish d ON d.id = r.dish_id
+        WHERE d.merchant_id = #{merchantId}
+          AND r.status = 'VISIBLE'
+    </select>
+
+    <update id="increaseReviewLikeCount">
+        UPDATE review
+        SET like_count = like_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="decreaseReviewLikeCount">
+        UPDATE review
+        SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateDishReviewStats">
+        UPDATE dish
+        SET review_count = #{reviewCount},
+            average_score = #{averageScore},
+            taste_score = #{tasteScore},
+            portion_score = #{portionScore},
+            value_score = #{valueScore}
+        WHERE id = #{dishId}
+    </update>
+
+    <update id="updateMerchantReviewStats">
+        UPDATE merchant
+        SET review_count = #{reviewCount},
+            average_score = #{averageScore}
+        WHERE id = #{merchantId}
+    </update>
 </mapper>

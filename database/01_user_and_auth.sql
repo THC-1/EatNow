@@ -25,9 +25,9 @@ ON DUPLICATE KEY UPDATE
 
 CREATE TABLE IF NOT EXISTS sys_user (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-  username VARCHAR(64) DEFAULT NULL COMMENT 'Admin login username',
-  password_hash VARCHAR(255) DEFAULT NULL COMMENT 'Encrypted password for admin login',
-  wechat_openid VARCHAR(128) DEFAULT NULL COMMENT 'Wechat openid for student/merchant login',
+  username VARCHAR(64) DEFAULT NULL COMMENT 'Account username for admin and Android password login',
+  password_hash VARCHAR(255) DEFAULT NULL COMMENT 'Encrypted password for account login',
+  wechat_openid VARCHAR(128) DEFAULT NULL COMMENT 'Wechat mini-program openid for student/merchant login',
   nickname VARCHAR(64) NOT NULL COMMENT 'Nickname',
   avatar_url VARCHAR(255) DEFAULT NULL COMMENT 'Avatar URL',
   phone VARCHAR(20) DEFAULT NULL COMMENT 'Phone number',

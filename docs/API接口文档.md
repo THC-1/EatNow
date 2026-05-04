@@ -1,8 +1,8 @@
-# 吃点啥 - 校园餐饮与商户评价推荐平台 API 接口文档
+# 点儿啥 - 校园餐饮与商户评价推荐平台 API 接口文档
 
 ## 文档说明
 
-本文档描述"吃点啥"平台的所有 RESTful API 接口。所有接口均遵循 RESTful 设计规范:
+本文档描述"点儿啥"平台的所有 RESTful API 接口。所有接口均遵循 RESTful 设计规范:
 - URL 路径全部小写,使用中划线 `-` 分隔单词
 - 通过 HTTP Method 表达操作: GET(查询)、POST(创建)、PUT(全量更新)、PATCH(局部更新)、DELETE(删除)
 - 请求入参使用 DTO,返回出参使用 VO
@@ -64,7 +64,7 @@
 ### 1.1 学生微信登录
 
 - **接口**: `POST /api/v1/auth/student-login`
-- **描述**: 学生用户通过微信授权登录
+- **描述**: 学生用户通过微信授权登录(小程序)
 - **请求参数**:
 
 ```json
@@ -81,6 +81,9 @@
   "message": "success",
   "data": {
     "token": "JWT Token",
+    "refreshToken": "刷新令牌",
+    "tokenExpiresAt": 1760000000000,
+    "refreshTokenExpiresAt": 1760600000000,
     "isNewUser": true,
     "userId": 123
   }
@@ -90,7 +93,7 @@
 ### 1.2 卖家微信登录
 
 - **接口**: `POST /api/v1/auth/merchant-login`
-- **描述**: 卖家通过微信授权登录
+- **描述**: 卖家通过微信授权登录(小程序)
 - **请求参数**:
 
 ```json
@@ -107,13 +110,84 @@
   "message": "success",
   "data": {
     "token": "JWT Token",
+    "refreshToken": "刷新令牌",
+    "tokenExpiresAt": 1760000000000,
+    "refreshTokenExpiresAt": 1760600000000,
+    "userId": 123,
     "merchantId": 456,
-    "applyStatus": "APPROVED"
+    "applyStatus": "APPROVED",
+    "merchantStatus": "OPEN"
   }
 }
 ```
 
-### 1.3 管理员登录
+### 1.3 Android账号登录
+
+- **接口**: `POST /api/v1/auth/android/login`
+- **描述**: Android端普通账号通过账号密码登录。返回的 `roles` 用于判断是否已具备商家入口权限。
+- **请求参数**:
+
+```json
+{
+  "username": "用户名",
+  "password": "密码"
+}
+```
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "token": "JWT Token",
+    "refreshToken": "刷新令牌",
+    "tokenExpiresAt": 1760000000000,
+    "refreshTokenExpiresAt": 1760600000000,
+    "userId": 123,
+    "roles": ["STUDENT"]
+  }
+}
+```
+
+### 1.4 Android账号注册
+
+- **接口**: `POST /api/v1/auth/android/register`
+- **描述**: Android端注册普通账号。注册成功后默认绑定 `STUDENT` 角色并直接返回Token。
+- **请求参数**:
+
+```json
+{
+  "username": "用户名",
+  "password": "密码",
+  "nickname": "昵称"
+}
+```
+
+- **字段说明**:
+  - `username`: 必填,4-64位,全局唯一
+  - `password`: 必填,6-64位
+  - `nickname`: 可选,不传时默认使用用户名
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "token": "JWT Token",
+    "refreshToken": "刷新令牌",
+    "tokenExpiresAt": 1760000000000,
+    "refreshTokenExpiresAt": 1760600000000,
+    "userId": 123,
+    "roles": ["STUDENT"]
+  }
+}
+```
+
+### 1.5 管理员登录
 
 - **接口**: `POST /api/v1/auth/admin-login`
 - **描述**: 平台管理员通过账号密码登录
@@ -134,8 +208,87 @@
   "message": "success",
   "data": {
     "token": "JWT Token",
+    "refreshToken": "刷新令牌",
+    "tokenExpiresAt": 1760000000000,
+    "refreshTokenExpiresAt": 1760600000000,
     "adminId": 1
   }
+}
+```
+
+### 1.6 刷新Token
+
+- **接口**: `POST /api/v1/auth/refresh`
+- **描述**: 使用刷新令牌获取新的Token对
+- **请求参数**:
+
+```json
+{
+  "refreshToken": "刷新令牌"
+}
+```
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "token": "新的访问令牌",
+    "refreshToken": "新的刷新令牌",
+    "tokenExpiresAt": 1760000000000,
+    "refreshTokenExpiresAt": 1760600000000
+  }
+}
+```
+
+### 1.7 用户登出
+
+- **接口**: `POST /api/v1/auth/logout`
+- **描述**: 用户登出,使Token失效
+- **请求头**: `Authorization: Bearer <accessToken>`
+- **请求参数**:
+
+```json
+{
+  "refreshToken": "刷新令牌"
+}
+```
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+### 1.8 修改密码
+
+- **接口**: `POST /api/v1/auth/change-password`
+- **描述**: 修改当前登录用户的密码
+- **权限**: 登录用户
+- **请求参数**:
+
+```json
+{
+  "currentPassword": "当前密码",
+  "newPassword": "新密码"
+}
+```
+
+- **新密码长度**: 6-64位
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
 }
 ```
 
@@ -448,8 +601,8 @@
 ### 4.3 提交卖家入驻申请
 
 - **接口**: `POST /api/v1/merchants/apply`
-- **描述**: 提交商家入驻申请
-- **权限**: 卖家用户
+- **描述**: 普通登录用户提交商家入驻申请。审核通过后,系统会为该账号授予 `MERCHANT` 角色,Android端重新登录或刷新Token后即可进入商家页面。
+- **权限**: 登录用户
 - **请求参数**:
 
 ```json
@@ -478,8 +631,8 @@
 ### 4.4 获取我的商家信息
 
 - **接口**: `GET /api/v1/merchants/me`
-- **描述**: 获取当前登录卖家的商家信息
-- **权限**: 卖家用户
+- **描述**: 获取当前登录用户的商家信息或入驻申请状态;未提交申请时返回404。
+- **权限**: 登录用户
 - **响应参数**:
 
 ```json
@@ -494,7 +647,7 @@
 
 - **接口**: `PUT /api/v1/merchants/me`
 - **描述**: 更新当前商家信息
-- **权限**: 卖家用户
+- **权限**: 卖家用户(`MERCHANT`角色)
 - **请求参数**:
 
 ```json
@@ -618,7 +771,7 @@
 - **查询参数**:
   - `keyword`: 搜索关键词(必填)
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**: 同获取菜品列表
 
 ### 5.4 新增菜品(卖家)
@@ -796,7 +949,7 @@
 
 ## 七、收藏模块
 
-### 7.1 收藏菜品
+### 7.1 收藏菜品/分享
 
 - **接口**: `POST /api/v1/favorites`
 - **描述**: 收藏菜品或学生分享
@@ -848,7 +1001,7 @@
 - **查询参数**:
   - `targetType`: 收藏类型(可选) - `DISH` 或 `POST`
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -885,8 +1038,8 @@
 - **描述**: 检查当前用户是否已收藏指定目标
 - **权限**: 学生用户
 - **查询参数**:
-  - `targetType`: 收藏类型
-  - `targetId`: 目标ID
+  - `targetType`: 收藏类型(必填)
+  - `targetId`: 目标ID(必填)
 - **响应参数**:
 
 ```json
@@ -894,7 +1047,8 @@
   "code": 200,
   "message": "success",
   "data": {
-    "isFavorite": true
+    "isFavorite": true,
+    "favoriteId": 1
   }
 }
 ```
@@ -945,7 +1099,7 @@
   - `targetId`: 目标ID(必填)
   - `sortBy`: 排序方式(可选) - `latest`(最新)、`highest`(最高分)、`lowest`(最低分)
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1023,7 +1177,7 @@
 - **权限**: 学生用户
 - **查询参数**:
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1099,7 +1253,7 @@
   - `feedbackType`: 反馈类型(可选)
   - `status`: 反馈状态(可选) - `PENDING`、`VIEWED`、`ACCEPTED`、`IMPROVED`、`REJECTED`
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1178,9 +1332,126 @@
 
 ---
 
-## 十、商家推荐模块
+## 十、想吃清单模块
 
-### 10.1 发布推荐
+### 10.1 添加到想吃清单
+
+- **接口**: `POST /api/v1/eat-list`
+- **描述**: 将菜品添加到想吃清单
+- **权限**: 学生用户
+- **请求参数**:
+
+```json
+{
+  "dishId": 100,
+  "sourceLotteryRecordId": 1,
+  "note": "备注信息"
+}
+```
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1
+  }
+}
+```
+
+### 10.2 获取想吃清单列表
+
+- **接口**: `GET /api/v1/eat-list`
+- **描述**: 获取当前用户的想吃清单列表
+- **权限**: 学生用户
+- **查询参数**:
+  - `status`: 状态(可选) - `WANT_TO_EAT`、`EATEN`、`CANCELLED`
+  - `page`: 页码(默认1)
+  - `size`: 每页数量(默认10,最大50)
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [
+      {
+        "id": 1,
+        "userId": 123,
+        "dishId": 100,
+        "status": "WANT_TO_EAT",
+        "sourceLotteryRecordId": 1,
+        "note": "备注信息",
+        "createdAt": "2026-04-24T10:00:00",
+        "eatenAt": null,
+        "updatedAt": "2026-04-24T10:00:00",
+        "dish": {
+          "id": 100,
+          "name": "黑椒鸡排饭",
+          "price": 15.0,
+          "score": 4.5,
+          "merchantName": "张三快餐",
+          "canteenName": "第一食堂",
+          "images": ["图片URL1", "图片URL2"]
+        }
+      }
+    ],
+    "total": 20,
+    "page": 1,
+    "size": 10
+  }
+}
+```
+
+### 10.3 标记已吃
+
+- **接口**: `PATCH /api/v1/eat-list/{id}/eaten`
+- **描述**: 将想吃清单中的菜品标记为已吃
+- **权限**: 学生用户
+- **路径参数**: `id` - 想吃清单记录ID
+- **请求参数**:
+
+```json
+{
+  "note": "更新后的备注",
+  "eatenAt": "2026-04-24T12:00:00"
+}
+```
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+### 10.4 取消想吃清单记录
+
+- **接口**: `DELETE /api/v1/eat-list/{id}`
+- **描述**: 取消想吃清单中的某条记录
+- **权限**: 学生用户
+- **路径参数**: `id` - 想吃清单记录ID
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+---
+
+## 十一、商家推荐模块
+
+### 11.1 发布推荐
 
 - **接口**: `POST /api/v1/merchant-recommendations`
 - **描述**: 商家发布菜品推荐
@@ -1213,7 +1484,7 @@
 }
 ```
 
-### 10.2 获取我的推荐列表
+### 11.2 获取我的推荐列表
 
 - **接口**: `GET /api/v1/merchant-recommendations`
 - **描述**: 获取当前商家的推荐列表
@@ -1222,7 +1493,7 @@
   - `recommendType`: 推荐类型(可选)
   - `status`: 状态(可选)
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1254,7 +1525,7 @@
 }
 ```
 
-### 10.3 更新推荐
+### 11.3 更新推荐
 
 - **接口**: `PUT /api/v1/merchant-recommendations/{id}`
 - **描述**: 更新推荐信息
@@ -1283,7 +1554,7 @@
 }
 ```
 
-### 10.4 删除推荐
+### 11.4 删除推荐
 
 - **接口**: `DELETE /api/v1/merchant-recommendations/{id}`
 - **描述**: 删除推荐
@@ -1301,9 +1572,86 @@
 
 ---
 
-## 十一、抽奖推荐模块
+## 十二、商家改进记录模块
 
-### 11.1 随机抽奖
+### 12.1 创建改进记录
+
+- **接口**: `POST /api/v1/merchant/improvement-records`
+- **描述**: 商家发布改进记录
+- **权限**: 卖家用户
+- **请求参数**:
+
+```json
+{
+  "dishId": 100,
+  "feedbackId": 1,
+  "title": "已增加米饭分量",
+  "content": "根据同学们反馈，我们已增加米饭的标准分量",
+  "beforeDescription": "原来米饭分量较少",
+  "afterDescription": "现在每份增加50克米饭",
+  "status": "PUBLISHED",
+  "isPublic": true
+}
+```
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1
+  }
+}
+```
+
+### 12.2 获取改进记录列表
+
+- **接口**: `GET /api/v1/merchant/improvement-records`
+- **描述**: 获取当前商家的改进记录列表
+- **权限**: 卖家用户
+- **查询参数**:
+  - `dishId`: 菜品ID(可选)
+  - `feedbackId`: 反馈ID(可选)
+  - `status`: 状态(可选) - `DRAFT`、`PUBLISHED`、`ARCHIVED`
+  - `page`: 页码(默认1)
+  - `size`: 每页数量(默认10,最大50)
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [
+      {
+        "id": 1,
+        "dishId": 100,
+        "dishName": "黑椒鸡排饭",
+        "feedbackId": 1,
+        "feedbackContent": "米饭分量有点少",
+        "title": "已增加米饭分量",
+        "content": "根据同学们反馈，我们已增加米饭的标准分量",
+        "beforeDescription": "原来米饭分量较少",
+        "afterDescription": "现在每份增加50克米饭",
+        "status": "PUBLISHED",
+        "isPublic": true,
+        "createdAt": "2026-04-24T10:00:00"
+      }
+    ],
+    "total": 10,
+    "page": 1,
+    "size": 10
+  }
+}
+```
+
+---
+
+## 十三、抽奖推荐模块
+
+### 13.1 随机抽奖
 
 - **接口**: `POST /api/v1/lottery/draw`
 - **描述**: 全平台随机抽奖
@@ -1339,7 +1687,7 @@
 }
 ```
 
-### 11.2 条件抽奖
+### 13.2 条件抽奖
 
 - **接口**: `POST /api/v1/lottery/draw-with-condition`
 - **描述**: 按条件抽奖
@@ -1359,7 +1707,7 @@
 
 - **响应参数**: 同随机抽奖
 
-### 11.3 从收藏中抽奖
+### 13.3 从收藏中抽奖
 
 - **接口**: `POST /api/v1/lottery/draw-from-favorites`
 - **描述**: 从收藏的菜品中随机抽取
@@ -1374,14 +1722,14 @@
 
 - **响应参数**: 同随机抽奖
 
-### 11.4 获取抽奖历史
+### 13.4 获取抽奖历史
 
 - **接口**: `GET /api/v1/lottery/records`
 - **描述**: 获取当前用户的抽奖历史
 - **权限**: 学生用户
 - **查询参数**:
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1410,7 +1758,7 @@
 }
 ```
 
-### 11.5 记录抽奖结果行为
+### 13.5 记录抽奖结果行为
 
 - **接口**: `POST /api/v1/lottery/records/{id}/action`
 - **描述**: 记录用户对抽奖结果的行为
@@ -1438,16 +1786,16 @@
 
 ---
 
-## 十二、排行榜模块
+## 十四、排行榜模块
 
-### 12.1 获取好评榜
+### 14.1 获取好评榜
 
 - **接口**: `GET /api/v1/rankings/top-rated`
 - **描述**: 获取评分最高的菜品排行
 - **查询参数**:
   - `canteenId`: 商业区ID(可选)
   - `categoryId`: 分类ID(可选)
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1471,56 +1819,133 @@
 }
 ```
 
-### 12.2 获取热门榜
+### 14.2 获取热门榜
 
 - **接口**: `GET /api/v1/rankings/popular`
 - **描述**: 获取最热门的菜品排行(按浏览量和收藏数)
 - **查询参数**:
   - `canteenId`: 商业区ID(可选)
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**: 同好评榜
 
-### 12.3 获取收藏榜
+### 14.3 获取收藏榜
 
 - **接口**: `GET /api/v1/rankings/most-favorited`
 - **描述**: 获取收藏数最多的菜品排行
 - **查询参数**:
   - `canteenId`: 商业区ID(可选)
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**: 同好评榜
 
-### 12.4 获取高性价比榜
+### 14.4 获取高性价比榜
 
 - **接口**: `GET /api/v1/rankings/best-value`
 - **描述**: 获取性价比最高的菜品排行
 - **查询参数**:
   - `canteenId`: 商业区ID(可选)
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**: 同好评榜
 
-### 12.5 获取新品推荐榜
+### 14.5 获取新品推荐榜
 
 - **接口**: `GET /api/v1/rankings/new-dishes`
 - **描述**: 获取最新上架的菜品排行
 - **查询参数**:
   - `canteenId`: 商业区ID(可选)
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**: 同好评榜
 
-### 12.6 获取反馈较多榜
+### 14.6 获取反馈较多榜
 
 - **接口**: `GET /api/v1/rankings/most-feedback`
-- **描述**: 获取反馈较多的菜品排行(待改进)
+- **描述**: 获取反馈较多的菜品排行
 - **查询参数**:
   - `canteenId`: 商业区ID(可选)
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**: 同好评榜
 
 ---
 
-## 十三、管理员模块
+## 十五、商家数据看板模块
 
-### 13.1 获取用户列表
+### 15.1 获取商家数据概览
+
+- **接口**: `GET /api/v1/merchant/statistics/overview`
+- **描述**: 获取当前商家的数据概览
+- **权限**: 卖家用户
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "dishCount": 20,
+    "viewCount": 8000,
+    "favoriteCount": 500,
+    "reviewCount": 200,
+    "averageScore": 4.3,
+    "todayRecommendClickCount": 150,
+    "pendingFeedbackCount": 10
+  }
+}
+```
+
+### 15.2 获取最受欢迎菜品
+
+- **接口**: `GET /api/v1/merchant/statistics/popular-dishes`
+- **描述**: 获取商家最受欢迎的菜品
+- **权限**: 卖家用户
+- **查询参数**:
+  - `limit`: 数量限制(默认10,最大50)
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "dishId": 100,
+      "dishName": "黑椒鸡排饭",
+      "viewCount": 5000,
+      "favoriteCount": 200,
+      "reviewCount": 100,
+      "averageScore": 4.5
+    }
+  ]
+}
+```
+
+### 15.3 获取反馈较多菜品
+
+- **接口**: `GET /api/v1/merchant/statistics/most-feedback-dishes`
+- **描述**: 获取反馈较多的菜品
+- **权限**: 卖家用户
+- **查询参数**:
+  - `limit`: 数量限制(默认10,最大50)
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "dishId": 100,
+      "dishName": "黑椒鸡排饭",
+      "feedbackCount": 15,
+      "pendingFeedbackCount": 5
+    }
+  ]
+}
+```
+
+---
+
+## 十六、管理员模块
+
+### 16.1 获取用户列表
 
 - **接口**: `GET /api/v1/admin/users`
 - **描述**: 获取所有用户列表
@@ -1530,7 +1955,7 @@
   - `status`: 状态(可选)
   - `keyword`: 搜索关键词(可选)
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1556,7 +1981,7 @@
 }
 ```
 
-### 13.2 获取用户详情
+### 16.2 获取用户详情
 
 - **接口**: `GET /api/v1/admin/users/{id}`
 - **描述**: 获取用户详细信息
@@ -1572,7 +1997,7 @@
 }
 ```
 
-### 13.3 禁用用户
+### 16.3 禁用用户
 
 - **接口**: `PATCH /api/v1/admin/users/{id}/disable`
 - **描述**: 禁用违规用户
@@ -1588,7 +2013,7 @@
 }
 ```
 
-### 13.4 恢复用户
+### 16.4 恢复用户
 
 - **接口**: `PATCH /api/v1/admin/users/{id}/enable`
 - **描述**: 恢复被禁用的用户
@@ -1604,7 +2029,7 @@
 }
 ```
 
-### 13.5 获取卖家入驻申请列表
+### 16.5 获取卖家入驻申请列表
 
 - **接口**: `GET /api/v1/admin/merchant-applications`
 - **描述**: 获取卖家入驻申请列表
@@ -1612,7 +2037,7 @@
 - **查询参数**:
   - `applyStatus`: 申请状态(可选) - `PENDING`、`APPROVED`、`REJECTED`
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1639,7 +2064,7 @@
 }
 ```
 
-### 13.6 审核卖家入驻申请
+### 16.6 审核卖家入驻申请
 
 - **接口**: `PATCH /api/v1/admin/merchant-applications/{merchantId}/approve`
 - **描述**: 审核通过卖家入驻申请
@@ -1655,7 +2080,7 @@
 }
 ```
 
-### 13.7 驳回卖家入驻申请
+### 16.7 驳回卖家入驻申请
 
 - **接口**: `PATCH /api/v1/admin/merchant-applications/{merchantId}/reject`
 - **描述**: 驳回卖家入驻申请
@@ -1679,10 +2104,10 @@
 }
 ```
 
-### 13.8 新增商业区
+### 16.8 新增商业区
 
 - **接口**: `POST /api/v1/admin/canteens`
-- **描述**: 新增商业区(食堂、校内店铺、校园周边店铺等)
+- **描述**: 新增商业区
 - **权限**: 管理员
 - **请求参数**:
 
@@ -1709,7 +2134,7 @@
 }
 ```
 
-### 13.9 更新商业区
+### 16.9 更新商业区
 
 - **接口**: `PUT /api/v1/admin/canteens/{id}`
 - **描述**: 更新商业区信息
@@ -1736,7 +2161,7 @@
 }
 ```
 
-### 13.10 删除商业区
+### 16.10 删除商业区
 
 - **接口**: `DELETE /api/v1/admin/canteens/{id}`
 - **描述**: 删除商业区
@@ -1752,7 +2177,7 @@
 }
 ```
 
-### 13.11 新增店铺
+### 16.11 新增店铺
 
 - **接口**: `POST /api/v1/admin/stalls`
 - **描述**: 新增店铺
@@ -1780,7 +2205,7 @@
 }
 ```
 
-### 13.12 更新店铺
+### 16.12 更新店铺
 
 - **接口**: `PUT /api/v1/admin/stalls/{id}`
 - **描述**: 更新店铺信息
@@ -1806,7 +2231,7 @@
 }
 ```
 
-### 13.13 删除店铺
+### 16.13 删除店铺
 
 - **接口**: `DELETE /api/v1/admin/stalls/{id}`
 - **描述**: 删除店铺
@@ -1822,7 +2247,128 @@
 }
 ```
 
-### 13.14 获取评价列表(管理员)
+### 16.14 获取菜品列表(管理员)
+
+- **接口**: `GET /api/v1/admin/dishes`
+- **描述**: 获取菜品列表(管理员视角)
+- **权限**: 管理员
+- **查询参数**:
+  - `merchantId`: 商家ID(可选)
+  - `canteenId`: 商业区ID(可选)
+  - `stallId`: 店铺ID(可选)
+  - `status`: 状态(可选)
+  - `keyword`: 搜索关键词(可选)
+  - `page`: 页码(默认1)
+  - `size`: 每页数量(默认10,最大50)
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [
+      {
+        "id": 100,
+        "merchantId": 5,
+        "merchantName": "张三快餐",
+        "canteenId": 1,
+        "canteenName": "第一食堂",
+        "stallId": 10,
+        "stallName": "快餐窗口",
+        "categoryId": 1,
+        "categoryName": "盖饭",
+        "name": "黑椒鸡排饭",
+        "price": 15.0,
+        "coverImageUrl": "封面图URL",
+        "averageScore": 4.5,
+        "status": "ON_SALE",
+        "isJoinLottery": true,
+        "viewCount": 500,
+        "favoriteCount": 120,
+        "reviewCount": 45,
+        "createdAt": "2026-04-24T10:00:00"
+      }
+    ],
+    "total": 100,
+    "page": 1,
+    "size": 10
+  }
+}
+```
+
+### 16.15 获取菜品详情(管理员)
+
+- **接口**: `GET /api/v1/admin/dishes/{id}`
+- **描述**: 获取菜品详细信息(管理员视角)
+- **权限**: 管理员
+- **路径参数**: `id` - 菜品ID
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 100,
+    "merchantId": 5,
+    "merchantName": "张三快餐",
+    "merchantStatus": "OPEN",
+    "merchantApplyStatus": "APPROVED",
+    "canteenId": 1,
+    "canteenName": "第一食堂",
+    "stallId": 10,
+    "stallName": "快餐窗口",
+    "categoryId": 1,
+    "categoryName": "盖饭",
+    "name": "黑椒鸡排饭",
+    "description": "现炸鸡排配米饭",
+    "price": 15.0,
+    "coverImageUrl": "封面图URL",
+    "averageScore": 4.5,
+    "tasteScore": 4.6,
+    "portionScore": 4.3,
+    "valueScore": 4.5,
+    "status": "ON_SALE",
+    "isJoinLottery": true,
+    "viewCount": 500,
+    "favoriteCount": 120,
+    "reviewCount": 45,
+    "createdAt": "2026-04-24T10:00:00",
+    "updatedAt": "2026-04-24T10:00:00",
+    "images": ["图片URL1", "图片URL2"],
+    "tags": [{"id": 10, "name": "微辣"}, {"id": 11, "name": "管饱"}]
+  }
+}
+```
+
+### 16.16 更新菜品状态(管理员)
+
+- **接口**: `PATCH /api/v1/admin/dishes/{id}/status`
+- **描述**: 管理员更新菜品状态
+- **权限**: 管理员
+- **路径参数**: `id` - 菜品ID
+- **请求参数**:
+
+```json
+{
+  "status": "ON_SALE"
+}
+```
+
+- **状态枚举**: `ON_SALE`(上架中)、`SOLD_OUT`(已售罄)、`OFF_SHELF`(已下架)、`PENDING`(待审核)
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+### 16.17 获取评价列表(管理员)
 
 - **接口**: `GET /api/v1/admin/reviews`
 - **描述**: 获取所有评价列表
@@ -1832,7 +2378,7 @@
   - `status`: 状态(可选)
   - `keyword`: 搜索关键词(可选)
   - `page`: 页码(默认1)
-  - `size`: 每页数量(默认10)
+  - `size`: 每页数量(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1848,7 +2394,7 @@
 }
 ```
 
-### 13.15 删除违规评价
+### 16.18 删除违规评价
 
 - **接口**: `DELETE /api/v1/admin/reviews/{id}`
 - **描述**: 删除违规评价
@@ -1864,7 +2410,7 @@
 }
 ```
 
-### 13.16 获取平台统计数据
+### 16.19 获取平台统计数据
 
 - **接口**: `GET /api/v1/admin/statistics/overview`
 - **描述**: 获取平台整体统计数据
@@ -1886,13 +2432,13 @@
 }
 ```
 
-### 13.17 获取热门菜品排行
+### 16.20 获取热门菜品排行
 
 - **接口**: `GET /api/v1/admin/statistics/popular-dishes`
 - **描述**: 获取热门菜品统计
 - **权限**: 管理员
 - **查询参数**:
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1913,13 +2459,13 @@
 }
 ```
 
-### 13.18 获取热门商家排行
+### 16.21 获取热门商家排行
 
 - **接口**: `GET /api/v1/admin/statistics/popular-merchants`
 - **描述**: 获取热门商家统计
 - **权限**: 管理员
 - **查询参数**:
-  - `limit`: 数量限制(默认10)
+  - `limit`: 数量限制(默认10,最大50)
 - **响应参数**:
 
 ```json
@@ -1941,7 +2487,7 @@
 }
 ```
 
-### 13.19 获取用户活跃趋势
+### 16.22 获取用户活跃趋势
 
 - **接口**: `GET /api/v1/admin/statistics/user-activity`
 - **描述**: 获取用户活跃趋势数据
@@ -1966,7 +2512,7 @@
 }
 ```
 
-### 13.20 获取各商业区评分统计
+### 16.23 获取各商业区评分统计
 
 - **接口**: `GET /api/v1/admin/statistics/canteen-scores`
 - **描述**: 获取各商业区(食堂、校内店铺、校园周边店铺)评分统计
@@ -1992,86 +2538,9 @@
 
 ---
 
-## 十四、商家数据看板模块
+## 十七、文件上传模块
 
-### 14.1 获取商家数据概览
-
-- **接口**: `GET /api/v1/merchant/statistics/overview`
-- **描述**: 获取当前商家的数据概览
-- **权限**: 卖家用户
-- **响应参数**:
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "dishCount": 20,
-    "viewCount": 8000,
-    "favoriteCount": 500,
-    "reviewCount": 200,
-    "averageScore": 4.3,
-    "todayRecommendClickCount": 150,
-    "pendingFeedbackCount": 10
-  }
-}
-```
-
-### 14.2 获取最受欢迎菜品
-
-- **接口**: `GET /api/v1/merchant/statistics/popular-dishes`
-- **描述**: 获取商家最受欢迎的菜品
-- **权限**: 卖家用户
-- **查询参数**:
-  - `limit`: 数量限制(默认10)
-- **响应参数**:
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": [
-    {
-      "dishId": 100,
-      "dishName": "黑椒鸡排饭",
-      "viewCount": 5000,
-      "favoriteCount": 200,
-      "reviewCount": 100,
-      "averageScore": 4.5
-    }
-  ]
-}
-```
-
-### 14.3 获取反馈较多菜品
-
-- **接口**: `GET /api/v1/merchant/statistics/most-feedback-dishes`
-- **描述**: 获取反馈较多的菜品
-- **权限**: 卖家用户
-- **查询参数**:
-  - `limit`: 数量限制(默认10)
-- **响应参数**:
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": [
-    {
-      "dishId": 100,
-      "dishName": "黑椒鸡排饭",
-      "feedbackCount": 15,
-      "pendingFeedbackCount": 5
-    }
-  ]
-}
-```
-
----
-
-## 十五、文件上传模块
-
-### 15.1 上传图片
+### 17.1 上传图片
 
 - **接口**: `POST /api/v1/files/upload-image`
 - **描述**: 上传图片文件
@@ -2162,3 +2631,20 @@
 - `RANDOM`: 随机抽奖
 - `CONDITION`: 条件抽奖
 - `FAVORITE`: 从收藏中抽
+
+### 收藏类型
+
+- `DISH`: 商家菜品
+- `POST`: 学生分享
+
+### 改进记录状态
+
+- `DRAFT`: 草稿
+- `PUBLISHED`: 已发布
+- `ARCHIVED`: 已归档
+
+### 想吃清单状态
+
+- `WANT_TO_EAT`: 想吃
+- `EATEN`: 已吃
+- `CANCELLED`: 已取消

@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.merchant.mapper.MerchantMapper">
+
+    <select id="selectMerchantList" resultType="com.eatnow.backend.merchant.vo.MerchantListVo">
+        SELECT
+            m.id,
+            m.user_id AS userId,
+            m.stall_id AS stallId,
+            m.name,
+            m.description,
+            m.logo_url AS logoUrl,
+            m.business_hours AS businessHours,
+            m.status,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            s.name AS stallName,
+            m.average_score AS averageScore,
+            (
+                SELECT COUNT(1)
+                FROM dish d
+                WHERE d.merchant_id = m.id
+                  AND d.status IN ('ON_SALE', 'SOLD_OUT')
+            ) AS dishCount
+        FROM merchant m
+        INNER JOIN stall s ON s.id = m.stall_id AND s.status = 'OPEN'
+        INNER JOIN canteen c ON c.id = s.canteen_id AND c.status = 'OPEN'
+        WHERE m.apply_status = 'APPROVED'
+          AND m.status = #{status}
+        <if test="canteenId != null">
+            AND c.id = #{canteenId}
+        </if>
+        <if test="stallId != null">
+            AND s.id = #{stallId}
+        </if>
+        ORDER BY m.id ASC
+    </select>
+
+    <select id="selectMerchantDetail" resultType="com.eatnow.backend.merchant.vo.MerchantDetailVo">
+        SELECT
+            m.id,
+            m.user_id AS userId,
+            m.stall_id AS stallId,
+            m.name,
+            m.description,
+            m.logo_url AS logoUrl,
+            m.business_hours AS businessHours,
+            m.status,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            s.name AS stallName,
+            m.average_score AS averageScore,
+            (
+                SELECT COUNT(1)
+                FROM dish d
+                WHERE d.merchant_id = m.id
+                  AND d.status IN ('ON_SALE', 'SOLD_OUT')
+            ) AS dishCount,
+            m.favorite_count AS favoriteCount,
+            m.review_count AS commentCount
+        FROM merchant m
+        INNER JOIN stall s ON s.id = m.stall_id AND s.status = 'OPEN'
+        INNER JOIN canteen c ON c.id = s.canteen_id AND c.status = 'OPEN'
+        WHERE m.id = #{id}
+          AND m.apply_status = 'APPROVED'
+          AND m.status = #{status}
+        LIMIT 1
+    </select>
+
+    <select id="selectMerchantProfileByUserId" resultType="com.eatnow.backend.merchant.vo.MerchantProfileVo">
+        SELECT
+            m.id,
+            m.user_id AS userId,
+            m.stall_id AS stallId,
+            c.id AS canteenId,
+            m.name,
+            m.description,
+            m.logo_url AS logoUrl,
+            m.contact_phone AS contactPhone,
+            m.business_hours AS businessHours,
+            m.apply_status AS applyStatus,
+            m.status,
+            m.reject_reason AS rejectReason,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            s.name AS stallName,
+            m.average_score AS averageScore,
+            (
+                SELECT COUNT(1)
+                FROM dish d
+                WHERE d.merchant_id = m.id
+                  AND d.status IN ('ON_SALE', 'SOLD_OUT')
+            ) AS dishCount,
+            m.favorite_count AS favoriteCount,
+            m.review_count AS commentCount,
+            m.approved_at AS approvedAt,
+            m.created_at AS createdAt,
+            m.updated_at AS updatedAt
+        FROM merchant m
+        LEFT JOIN stall s ON s.id = m.stall_id
+        LEFT JOIN canteen c ON c.id = s.canteen_id
+        WHERE m.user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <select id="selectMerchantStatisticsOverview" resultType="com.eatnow.backend.merchant.vo.MerchantStatisticsOverviewVo">
+        SELECT
+            COALESCE(dish_stats.dishCount, 0) AS dishCount,
+            COALESCE(dish_stats.viewCount, 0) AS viewCount,
+            COALESCE(dish_stats.favoriteCount, 0) AS favoriteCount,
+            COALESCE(dish_stats.reviewCount, 0) AS reviewCount,
+            m.average_score AS averageScore,
+            COALESCE(recommend_stats.todayRecommendClickCount, 0) AS todayRecommendClickCount,
+            COALESCE(feedback_stats.pendingFeedbackCount, 0) AS pendingFeedbackCount
+        FROM merchant m
+        LEFT JOIN (
+            SELECT
+                merchant_id,
+                COUNT(1) AS dishCount,
+                SUM(view_count) AS viewCount,
+                SUM(favorite_count) AS favoriteCount,
+                SUM(review_count) AS reviewCount
+            FROM dish
+            WHERE merchant_id = #{merchantId}
+            GROUP BY merchant_id
+        ) dish_stats ON dish_stats.merchant_id = m.id
+        LEFT JOIN (
+            SELECT
+                merchant_id,
+                SUM(click_count) AS todayRecommendClickCount
+            FROM merchant_recommendation
+            WHERE merchant_id = #{merchantId}
+              AND status = 'ACTIVE'
+              AND start_time &lt; DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+              AND end_time &gt;= CURDATE()
+            GROUP BY merchant_id
+        ) recommend_stats ON recommend_stats.merchant_id = m.id
+        LEFT JOIN (
+            SELECT
+                merchant_id,
+                COUNT(1) AS pendingFeedbackCount
+            FROM feedback
+            WHERE merchant_id = #{merchantId}
+              AND status = 'PENDING'
+            GROUP BY merchant_id
+        ) feedback_stats ON feedback_stats.merchant_id = m.id
+        WHERE m.id = #{merchantId}
+        LIMIT 1
+    </select>
+
+    <select id="selectMerchantPopularDishes" resultType="com.eatnow.backend.merchant.vo.MerchantPopularDishVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS reviewCount,
+            d.average_score AS averageScore
+        FROM dish d
+        WHERE d.merchant_id = #{merchantId}
+        ORDER BY (d.view_count + d.favorite_count * 3 + d.review_count * 2) DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectMerchantMostFeedbackDishes" resultType="com.eatnow.backend.merchant.vo.MerchantFeedbackDishVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            COUNT(f.id) AS feedbackCount,
+            SUM(CASE WHEN f.status = 'PENDING' THEN 1 ELSE 0 END) AS pendingFeedbackCount
+        FROM dish d
+        INNER JOIN feedback f ON f.dish_id = d.id
+        WHERE d.merchant_id = #{merchantId}
+        GROUP BY d.id, d.name
+        ORDER BY feedbackCount DESC, pendingFeedbackCount DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

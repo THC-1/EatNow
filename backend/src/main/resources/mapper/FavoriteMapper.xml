@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.favorite.mapper.FavoriteMapper">
+
+    <select id="countFavorites" resultType="long">
+        SELECT COUNT(1)
+        FROM favorite
+        WHERE user_id = #{userId}
+        <if test="targetType != null and targetType != ''">
+            AND target_type = #{targetType}
+        </if>
+    </select>
+
+    <select id="selectFavoriteList" resultType="com.eatnow.backend.favorite.vo.FavoriteItemVo">
+        SELECT
+            id,
+            user_id AS userId,
+            target_type AS targetType,
+            target_id AS targetId,
+            created_at AS createdAt
+        FROM favorite
+        WHERE user_id = #{userId}
+        <if test="targetType != null and targetType != ''">
+            AND target_type = #{targetType}
+        </if>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectDishSummaries" resultType="com.eatnow.backend.favorite.vo.FavoriteSummaryRelationVo">
+        SELECT
+            d.id,
+            d.name AS title,
+            d.price,
+            d.average_score AS score,
+            di.image_url AS imageUrl
+        FROM dish d
+        LEFT JOIN dish_image di ON di.dish_id = d.id
+        WHERE d.id IN
+        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
+            #{dishId}
+        </foreach>
+        ORDER BY d.id ASC, di.is_cover DESC, di.sort_order ASC, di.id ASC
+    </select>
+
+    <select id="selectPostSummaries" resultType="com.eatnow.backend.favorite.vo.FavoriteSummaryRelationVo">
+        SELECT
+            sp.id,
+            sp.title,
+            sp.dish_name AS dishName,
+            sp.price,
+            sp.score,
+            spi.image_url AS imageUrl
+        FROM student_post sp
+        LEFT JOIN student_post_image spi ON spi.post_id = sp.id
+        WHERE sp.id IN
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">
+            #{postId}
+        </foreach>
+        ORDER BY sp.id ASC, spi.sort_order ASC, spi.id ASC
+    </select>
+
+    <select id="countDishById" resultType="int">
+        SELECT COUNT(1)
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        WHERE d.id = #{id}
+          AND d.status IN ('ON_SALE', 'SOLD_OUT')
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+    </select>
+
+    <select id="countPostById" resultType="int">
+        SELECT COUNT(1)
+        FROM student_post
+        WHERE id = #{id}
+          AND status = 'PUBLISHED'
+    </select>
+
+    <update id="increaseDishFavoriteCount">
+        UPDATE dish
+        SET favorite_count = favorite_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="decreaseDishFavoriteCount">
+        UPDATE dish
+        SET favorite_count = CASE WHEN favorite_count > 0 THEN favorite_count - 1 ELSE 0 END
+        WHERE id = #{id}
+    </update>
+
+    <update id="increasePostFavoriteCount">
+        UPDATE student_post
+        SET favorite_count = favorite_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="decreasePostFavoriteCount">
+        UPDATE student_post
+        SET favorite_count = CASE WHEN favorite_count > 0 THEN favorite_count - 1 ELSE 0 END
+        WHERE id = #{id}
+    </update>
+</mapper>

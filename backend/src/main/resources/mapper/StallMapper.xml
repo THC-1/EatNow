@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.campus.mapper.StallMapper">
+
+    <select id="selectStallList" resultType="com.eatnow.backend.campus.vo.StallListVo">
+        SELECT
+            s.id,
+            s.canteen_id AS canteenId,
+            s.name,
+            s.location,
+            s.description,
+            s.status,
+            m.name AS merchantName
+        FROM stall s
+        LEFT JOIN merchant m
+            ON m.stall_id = s.id
+           AND m.apply_status = 'APPROVED'
+           AND m.status = #{status}
+        WHERE s.canteen_id = #{canteenId}
+          AND s.status = #{status}
+        ORDER BY s.sort_order ASC, s.id ASC
+    </select>
+
+    <select id="selectStallDetail" resultType="com.eatnow.backend.campus.vo.StallDetailVo">
+        SELECT
+            s.id,
+            s.canteen_id AS canteenId,
+            s.name,
+            s.location,
+            s.description,
+            s.status,
+            m.id AS merchantId,
+            m.name AS merchantName,
+            s.average_score AS averageScore,
+            (
+                SELECT COUNT(1)
+                FROM dish d
+                INNER JOIN merchant dm ON dm.id = d.merchant_id
+                WHERE d.stall_id = s.id
+                  AND d.status IN ('ON_SALE', 'SOLD_OUT')
+                  AND dm.apply_status = 'APPROVED'
+                  AND dm.status = 'OPEN'
+            ) AS dishCount
+        FROM stall s
+        LEFT JOIN merchant m
+            ON m.stall_id = s.id
+           AND m.apply_status = 'APPROVED'
+           AND m.status = #{status}
+        WHERE s.id = #{id}
+          AND s.status = #{status}
+        LIMIT 1
+    </select>
+</mapper>

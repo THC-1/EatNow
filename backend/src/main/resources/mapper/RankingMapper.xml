@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.ranking.mapper.RankingMapper">
+
+    <sql id="RankingBaseSelect">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            m.name AS merchantName,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            d.average_score AS score,
+            d.price,
+            d.favorite_count AS favoriteCount,
+            d.view_count AS viewCount,
+            d.review_count AS reviewCount,
+            d.cover_image_url AS coverImageUrl
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+    </sql>
+
+    <sql id="RankingBaseWhere">
+        WHERE d.status IN ('ON_SALE', 'SOLD_OUT')
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+        <if test="canteenId != null">
+            AND d.canteen_id = #{canteenId}
+        </if>
+    </sql>
+
+    <select id="selectTopRated" resultType="com.eatnow.backend.ranking.vo.RankingItemVo">
+        <include refid="RankingBaseSelect"/>
+        <include refid="RankingBaseWhere"/>
+        <if test="categoryId != null">
+            AND d.category_id = #{categoryId}
+        </if>
+        ORDER BY d.average_score DESC, d.review_count DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectPopular" resultType="com.eatnow.backend.ranking.vo.RankingItemVo">
+        <include refid="RankingBaseSelect"/>
+        <include refid="RankingBaseWhere"/>
+        ORDER BY (d.view_count + d.favorite_count * 3 + d.review_count * 2) DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectMostFavorited" resultType="com.eatnow.backend.ranking.vo.RankingItemVo">
+        <include refid="RankingBaseSelect"/>
+        <include refid="RankingBaseWhere"/>
+        ORDER BY d.favorite_count DESC, d.average_score DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectBestValue" resultType="com.eatnow.backend.ranking.vo.RankingItemVo">
+        <include refid="RankingBaseSelect"/>
+        <include refid="RankingBaseWhere"/>
+        ORDER BY (CASE WHEN d.price > 0 THEN d.value_score / d.price ELSE 0 END) DESC, d.value_score DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectNewDishes" resultType="com.eatnow.backend.ranking.vo.RankingItemVo">
+        <include refid="RankingBaseSelect"/>
+        <include refid="RankingBaseWhere"/>
+        ORDER BY d.created_at DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectMostFeedback" resultType="com.eatnow.backend.ranking.vo.RankingItemVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            m.name AS merchantName,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            d.average_score AS score,
+            d.price,
+            d.favorite_count AS favoriteCount,
+            d.view_count AS viewCount,
+            d.review_count AS reviewCount,
+            d.cover_image_url AS coverImageUrl,
+            COUNT(f.id) AS feedbackCount
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        LEFT JOIN feedback f ON f.dish_id = d.id AND f.status IN ('PENDING', 'VIEWED', 'ACCEPTED', 'IMPROVED')
+        <include refid="RankingBaseWhere"/>
+        GROUP BY d.id, d.name, m.name, c.name, c.type, d.average_score, d.price, d.favorite_count, d.view_count, d.review_count, d.cover_image_url
+        ORDER BY feedbackCount DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

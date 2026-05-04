@@ -2,4 +2,289 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.eatnow.backend.dish.mapper.DishMapper">
 
+    <sql id="DishBaseJoins">
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        LEFT JOIN category cg ON cg.id = d.category_id
+    </sql>
+
+    <sql id="DishBaseFilters">
+        WHERE m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+        <if test="query.canteenId != null">
+            AND d.canteen_id = #{query.canteenId}
+        </if>
+        <if test="query.stallId != null">
+            AND d.stall_id = #{query.stallId}
+        </if>
+        <if test="query.merchantId != null">
+            AND d.merchant_id = #{query.merchantId}
+        </if>
+        <if test="query.categoryId != null">
+            AND d.category_id = #{query.categoryId}
+        </if>
+        <if test="query.tagId != null">
+            AND EXISTS (
+                SELECT 1
+                FROM dish_tag dt
+                WHERE dt.dish_id = d.id
+                  AND dt.tag_id = #{query.tagId}
+            )
+        </if>
+        <if test="query.minPrice != null">
+            AND d.price <![CDATA[>=]]> #{query.minPrice}
+        </if>
+        <if test="query.maxPrice != null">
+            AND d.price <![CDATA[<=]]> #{query.maxPrice}
+        </if>
+        <if test="query.minScore != null">
+            AND d.average_score <![CDATA[>=]]> #{query.minScore}
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND d.name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <choose>
+            <when test="query.status != null and query.status != ''">
+                AND d.status = #{query.status}
+            </when>
+            <otherwise>
+                AND d.status IN ('ON_SALE', 'SOLD_OUT')
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="countDishes" resultType="long">
+        SELECT COUNT(1)
+        <include refid="DishBaseJoins"/>
+        <include refid="DishBaseFilters"/>
+    </select>
+
+    <select id="selectDishList" resultType="com.eatnow.backend.dish.vo.DishListVo">
+        SELECT
+            d.id,
+            d.merchant_id AS merchantId,
+            d.canteen_id AS canteenId,
+            d.stall_id AS stallId,
+            d.name,
+            d.description,
+            d.price,
+            d.category_id AS categoryId,
+            cg.name AS categoryName,
+            d.average_score AS score,
+            d.status,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS commentCount
+        <include refid="DishBaseJoins"/>
+        <include refid="DishBaseFilters"/>
+        ORDER BY d.average_score DESC, d.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectDishDetail" resultType="com.eatnow.backend.dish.vo.DishDetailVo">
+        SELECT
+            d.id,
+            d.merchant_id AS merchantId,
+            d.canteen_id AS canteenId,
+            d.stall_id AS stallId,
+            d.name,
+            d.description,
+            d.price,
+            d.category_id AS categoryId,
+            cg.name AS categoryName,
+            d.average_score AS score,
+            d.status,
+            d.is_join_lottery AS isJoinLottery,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS commentCount,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            s.name AS stallName,
+            m.name AS merchantName,
+            d.taste_score AS tasteScore,
+            d.portion_score AS portionScore,
+            d.value_score AS valueScore
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        LEFT JOIN category cg ON cg.id = d.category_id
+        WHERE d.id = #{id}
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+          AND d.status IN
+          <foreach collection="statusList" item="status" open="(" separator="," close=")">
+              #{status}
+          </foreach>
+        LIMIT 1
+    </select>
+
+    <select id="selectDishManageDetail" resultType="com.eatnow.backend.dish.vo.DishDetailVo">
+        SELECT
+            d.id,
+            d.merchant_id AS merchantId,
+            d.canteen_id AS canteenId,
+            d.stall_id AS stallId,
+            d.name,
+            d.description,
+            d.price,
+            d.category_id AS categoryId,
+            cg.name AS categoryName,
+            d.average_score AS score,
+            d.status,
+            d.is_join_lottery AS isJoinLottery,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS commentCount,
+            c.name AS canteenName,
+            c.type AS canteenType,
+            s.name AS stallName,
+            m.name AS merchantName,
+            d.taste_score AS tasteScore,
+            d.portion_score AS portionScore,
+            d.value_score AS valueScore
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        LEFT JOIN category cg ON cg.id = d.category_id
+        WHERE d.id = #{id}
+        <if test="merchantId != null">
+            AND d.merchant_id = #{merchantId}
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="selectDishTagsByDishIds" resultType="com.eatnow.backend.dish.vo.DishTagRelationVo">
+        SELECT
+            dt.dish_id AS dishId,
+            t.id AS tagId,
+            t.name AS tagName
+        FROM dish_tag dt
+        INNER JOIN tag t ON t.id = dt.tag_id
+        WHERE dt.dish_id IN
+        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
+            #{dishId}
+        </foreach>
+          AND t.status = 'ACTIVE'
+        ORDER BY t.sort_order ASC, t.id ASC
+    </select>
+
+    <select id="selectDishImagesByDishIds" resultType="com.eatnow.backend.dish.vo.DishImageRelationVo">
+        SELECT
+            di.dish_id AS dishId,
+            di.image_url AS imageUrl
+        FROM dish_image di
+        WHERE di.dish_id IN
+        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
+            #{dishId}
+        </foreach>
+        ORDER BY di.is_cover DESC, di.sort_order ASC, di.id ASC
+    </select>
+
+    <select id="selectCurrentRecommendReason" resultType="java.lang.String">
+        SELECT mr.recommend_reason
+        FROM merchant_recommendation mr
+        WHERE mr.dish_id = #{dishId}
+          AND mr.status = 'ACTIVE'
+          AND mr.start_time <![CDATA[<=]]> NOW()
+          AND mr.end_time <![CDATA[>=]]> NOW()
+        ORDER BY mr.is_top DESC, mr.start_time DESC, mr.id DESC
+        LIMIT 1
+    </select>
+
+    <update id="increaseViewCount">
+        UPDATE dish
+        SET view_count = view_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteDishImages">
+        DELETE FROM dish_image
+        WHERE dish_id = #{dishId}
+    </delete>
+
+    <insert id="insertDishImages">
+        INSERT INTO dish_image (dish_id, image_url, sort_order, is_cover)
+        VALUES
+        <foreach collection="images" item="image" index="index" separator=",">
+            (#{dishId}, #{image}, #{index}, CASE WHEN #{index} = 0 THEN 1 ELSE 0 END)
+        </foreach>
+    </insert>
+
+    <delete id="deleteDishTags">
+        DELETE FROM dish_tag
+        WHERE dish_id = #{dishId}
+    </delete>
+
+    <insert id="insertDishTags">
+        INSERT INTO dish_tag (dish_id, tag_id)
+        VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{dishId}, #{tagId})
+        </foreach>
+    </insert>
+
+    <insert id="upsertDishLotteryPool">
+        INSERT INTO lottery_pool (
+            source_type,
+            source_id,
+            merchant_id,
+            canteen_id,
+            stall_id,
+            category_id,
+            title,
+            price,
+            score,
+            cover_image_url,
+            recommend_reason,
+            weight,
+            status
+        )
+        SELECT
+            'DISH',
+            d.id,
+            d.merchant_id,
+            d.canteen_id,
+            d.stall_id,
+            d.category_id,
+            d.name,
+            d.price,
+            d.average_score,
+            d.cover_image_url,
+            NULL,
+            100,
+            CASE
+                WHEN d.is_join_lottery = 1 AND d.status IN ('ON_SALE', 'SOLD_OUT') THEN 'ACTIVE'
+                ELSE 'INACTIVE'
+            END
+        FROM dish d
+        WHERE d.id = #{dishId}
+        ON DUPLICATE KEY UPDATE
+            merchant_id = VALUES(merchant_id),
+            canteen_id = VALUES(canteen_id),
+            stall_id = VALUES(stall_id),
+            category_id = VALUES(category_id),
+            title = VALUES(title),
+            price = VALUES(price),
+            score = VALUES(score),
+            cover_image_url = VALUES(cover_image_url),
+            status = VALUES(status),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="updateDishLotteryPoolStatus">
+        UPDATE lottery_pool
+        SET status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE source_type = 'DISH'
+          AND source_id = #{dishId}
+    </update>
 </mapper>
