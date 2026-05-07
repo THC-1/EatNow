@@ -20,7 +20,7 @@ import java.util.UUID;
 public class FileUploadService {
 
     private static final Path UPLOAD_ROOT = Path.of("uploads");
-    private static final Set<String> ALLOWED_TYPES = Set.of("avatar", "dish", "review", "merchant-logo");
+    private static final Set<String> ALLOWED_TYPES = Set.of("avatar", "dish", "review", "post", "merchant-logo");
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
 

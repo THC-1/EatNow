@@ -2,22 +2,30 @@
   <view class="page dishes-page">
     <view class="search-panel">
       <view class="search-box">
-        <text class="search-icon">⌕</text>
+        <view class="search-icon"></view>
         <input v-model="keyword" confirm-type="search" placeholder="搜索菜品、窗口或口味" @confirm="load" />
       </view>
       <button class="search-btn" @tap="load">搜索</button>
     </view>
 
-    <scroll-view scroll-x class="filters" show-scrollbar="false">
-      <view class="filter-row">
-        <view v-for="item in scoreFilters" :key="item.value" :class="['filter', minScore === item.value ? 'active' : '']" @tap="setScore(item.value)">
-          <text>{{ item.label }}</text>
-        </view>
-        <view v-for="item in priceFilters" :key="item.value" :class="['filter', priceRange === item.value ? 'active' : '']" @tap="setPrice(item.value)">
-          <text>{{ item.label }}</text>
+    <view class="filters">
+      <view class="filter-group">
+        <text class="filter-label">评分</text>
+        <view class="filter-row">
+          <view v-for="item in scoreFilters" :key="item.value" :class="['filter', minScore === item.value ? 'active' : '']" @tap="setScore(item.value)">
+            <text>{{ item.label }}</text>
+          </view>
         </view>
       </view>
-    </scroll-view>
+      <view class="filter-group">
+        <text class="filter-label">价格</text>
+        <view class="filter-row">
+          <view v-for="item in priceFilters" :key="item.value" :class="['filter', priceRange === item.value ? 'active' : '']" @tap="setPrice(item.value)">
+            <text>{{ item.label }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
 
     <view v-if="rankingTitle" class="ranking-strip">
       <text>{{ rankingTitle }}</text>
@@ -27,7 +35,8 @@
     <view class="dish-list">
       <view v-for="dish in dishes" :key="dish.id" class="dish-item" @tap="goDetail(dish.id)">
         <view class="food-art dish-art">
-          <text>{{ shortName(dish.name) }}</text>
+          <image v-if="dishImage(dish)" :src="dishImage(dish)" mode="aspectFill" />
+          <text v-else>{{ shortName(dish.name) }}</text>
         </view>
         <view class="dish-info">
           <view class="dish-title-row">
@@ -52,6 +61,7 @@
 
 <script>
 import { fetchDishes, fetchRanking } from '../../services/student.js'
+import { assetUrl } from '../../utils/request.js'
 
 const rankingNames = {
   'top-rated': '好评榜',
@@ -104,6 +114,7 @@ export default {
           name: item.dishName,
           price: item.price,
           score: item.score,
+          coverImageUrl: item.coverImageUrl,
           canteenName: item.canteenName,
           merchantName: item.merchantName,
           description: `${item.favoriteCount || 0} 人收藏，榜单第 ${item.rank} 名`,
@@ -146,6 +157,10 @@ export default {
     shortName(name) {
       return name.slice(0, 2)
     },
+    dishImage(dish) {
+      const image = dish && dish.images && dish.images.length ? dish.images[0] : dish.coverImageUrl
+      return assetUrl(image)
+    },
     goDetail(id) {
       uni.navigateTo({ url: `/pages/dish-detail/index?id=${id}` })
     }
@@ -174,9 +189,7 @@ export default {
 
 .search-icon {
   margin-right: 12rpx;
-  color: #e94b35;
-  font-size: 36rpx;
-  font-weight: 900;
+  font-size: 0;
 }
 
 .search-box input {
@@ -200,27 +213,49 @@ export default {
 }
 
 .filters {
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
   margin-top: 22rpx;
-  white-space: nowrap;
+  padding: 20rpx;
+  border-radius: 28rpx;
+  background: rgba(255, 253, 247, 0.72);
+  border: 2rpx solid rgba(43, 33, 24, 0.08);
+}
+
+.filter-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+}
+
+.filter-label {
+  flex: 0 0 64rpx;
+  padding-top: 14rpx;
+  color: #7b6046;
+  font-size: 23rpx;
+  font-weight: 900;
 }
 
 .filter-row {
-  display: inline-flex;
-  gap: 14rpx;
-  padding-right: 28rpx;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  min-width: 0;
 }
 
 .filter {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  height: 62rpx;
-  padding: 0 22rpx;
-  border-radius: 999rpx;
+  min-width: 128rpx;
+  height: 58rpx;
+  padding: 0 18rpx;
+  border-radius: 18rpx;
   background: #fffdf7;
   color: #8a7a68;
-  font-size: 24rpx;
+  font-size: 23rpx;
   font-weight: 800;
   border: 2rpx solid rgba(43, 33, 24, 0.08);
 }
@@ -273,6 +308,20 @@ export default {
   color: #fffdf7;
   font-size: 36rpx;
   font-weight: 900;
+}
+
+.dish-art image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.dish-art text {
+  position: relative;
+  z-index: 1;
 }
 
 .dish-info {

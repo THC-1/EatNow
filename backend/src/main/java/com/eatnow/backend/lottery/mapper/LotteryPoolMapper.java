@@ -21,7 +21,13 @@ public interface LotteryPoolMapper {
             @Param("favoriteUserId") Long favoriteUserId
     );
 
-    List<LotteryTagRelationVo> selectDishTags(@Param("dishIds") List<Long> dishIds);
+    List<LotteryTagRelationVo> selectSourceTags(
+            @Param("sourceType") String sourceType,
+            @Param("sourceIds") List<Long> sourceIds
+    );
 
-    List<LotteryImageRelationVo> selectDishImages(@Param("dishIds") List<Long> dishIds);
+    List<LotteryImageRelationVo> selectSourceImages(
+            @Param("sourceType") String sourceType,
+            @Param("sourceIds") List<Long> sourceIds
+    );
 }

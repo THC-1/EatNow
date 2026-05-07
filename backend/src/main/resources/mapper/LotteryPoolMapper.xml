@@ -2,22 +2,68 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.eatnow.backend.lottery.mapper.LotteryPoolMapper">
 
-    <sql id="BaseLotteryFrom">
+    <select id="selectEligiblePools" resultType="com.eatnow.backend.lottery.vo.LotteryPoolItemVo">
+        SELECT
+            lp.id AS poolId,
+            lp.source_type AS sourceType,
+            lp.source_id AS sourceId,
+            lp.merchant_id AS merchantId,
+            lp.canteen_id AS canteenId,
+            lp.stall_id AS stallId,
+            lp.title,
+            lp.price,
+            lp.score,
+            lp.cover_image_url AS coverImageUrl,
+            CASE
+                WHEN lp.source_type = 'DISH' THEN COALESCE(
+                    (
+                        SELECT mr.recommend_reason
+                        FROM merchant_recommendation mr
+                        WHERE mr.dish_id = d.id
+                          AND mr.status = 'ACTIVE'
+                          AND mr.start_time <![CDATA[<=]]> NOW()
+                          AND mr.end_time <![CDATA[>=]]> NOW()
+                        ORDER BY mr.is_top DESC, mr.start_time DESC, mr.id DESC
+                        LIMIT 1
+                    ),
+                    lp.recommend_reason
+                )
+                ELSE lp.recommend_reason
+            END AS recommendReason,
+            lp.weight,
+            CASE WHEN lp.source_type = 'DISH' THEN m.name ELSE sp.shop_name END AS merchantName,
+            COALESCE(dc.name, pc.name, psc.name) AS canteenName,
+            COALESCE(dc.type, pc.type, psc.type) AS canteenType,
+            COALESCE(ds.name, ps.name) AS stallName
         FROM lottery_pool lp
-        INNER JOIN dish d ON d.id = lp.source_id AND lp.source_type = 'DISH'
-        INNER JOIN merchant m ON m.id = d.merchant_id
-        INNER JOIN stall s ON s.id = d.stall_id
-        INNER JOIN canteen c ON c.id = d.canteen_id
-    </sql>
-
-    <sql id="BaseLotteryWhere">
+        LEFT JOIN dish d ON d.id = lp.source_id AND lp.source_type = 'DISH'
+        LEFT JOIN merchant m ON m.id = d.merchant_id
+        LEFT JOIN stall ds ON ds.id = d.stall_id
+        LEFT JOIN canteen dc ON dc.id = d.canteen_id
+        LEFT JOIN student_post sp ON sp.id = lp.source_id AND lp.source_type = 'POST'
+        LEFT JOIN stall ps ON ps.id = sp.stall_id
+        LEFT JOIN canteen pc ON pc.id = sp.canteen_id
+        LEFT JOIN canteen psc ON psc.id = ps.canteen_id
         WHERE lp.status = 'ACTIVE'
-          AND d.status IN ('ON_SALE', 'SOLD_OUT')
-          AND d.is_join_lottery = 1
-          AND m.apply_status = 'APPROVED'
-          AND m.status = 'OPEN'
-          AND s.status = 'OPEN'
-          AND c.status = 'OPEN'
+          AND (
+              (
+                  lp.source_type = 'DISH'
+                  AND d.status IN ('ON_SALE', 'SOLD_OUT')
+                  AND d.is_join_lottery = 1
+                  AND m.apply_status = 'APPROVED'
+                  AND m.status = 'OPEN'
+                  AND ds.status = 'OPEN'
+                  AND dc.status = 'OPEN'
+              )
+              OR
+              (
+                  lp.source_type = 'POST'
+                  AND sp.status = 'PUBLISHED'
+                  AND sp.is_join_lottery = 1
+                  AND (sp.canteen_id IS NULL OR pc.status = 'OPEN')
+                  AND (sp.stall_id IS NULL OR (ps.status = 'OPEN' AND psc.status = 'OPEN'))
+              )
+          )
         <if test="canteenId != null">
             AND lp.canteen_id = #{canteenId}
         </if>
@@ -31,14 +77,32 @@
             AND lp.score <![CDATA[>=]]> #{minScore}
         </if>
         <if test="tagIds != null and tagIds.size() > 0">
-            AND EXISTS (
-                SELECT 1
-                FROM dish_tag dt
-                WHERE dt.dish_id = d.id
-                  AND dt.tag_id IN
-                  <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
-                      #{tagId}
-                  </foreach>
+            AND (
+                (
+                    lp.source_type = 'DISH'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM dish_tag dt
+                        WHERE dt.dish_id = d.id
+                          AND dt.tag_id IN
+                          <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+                              #{tagId}
+                          </foreach>
+                    )
+                )
+                OR
+                (
+                    lp.source_type = 'POST'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM student_post_tag spt
+                        WHERE spt.post_id = sp.id
+                          AND spt.tag_id IN
+                          <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+                              #{tagId}
+                          </foreach>
+                    )
+                )
             )
         </if>
         <if test="favoriteUserId != null">
@@ -46,70 +110,68 @@
                 SELECT 1
                 FROM favorite f
                 WHERE f.user_id = #{favoriteUserId}
-                  AND f.target_type = 'DISH'
-                  AND f.target_id = d.id
+                  AND f.target_type = lp.source_type
+                  AND f.target_id = lp.source_id
             )
         </if>
-    </sql>
-
-    <select id="selectEligiblePools" resultType="com.eatnow.backend.lottery.vo.LotteryPoolItemVo">
-        SELECT
-            lp.id AS poolId,
-            lp.source_type AS sourceType,
-            lp.source_id AS sourceId,
-            lp.merchant_id AS merchantId,
-            lp.canteen_id AS canteenId,
-            lp.stall_id AS stallId,
-            lp.title,
-            lp.price,
-            lp.score,
-            lp.cover_image_url AS coverImageUrl,
-            COALESCE(
-                (
-                    SELECT mr.recommend_reason
-                    FROM merchant_recommendation mr
-                    WHERE mr.dish_id = d.id
-                      AND mr.status = 'ACTIVE'
-                      AND mr.start_time <![CDATA[<=]]> NOW()
-                      AND mr.end_time <![CDATA[>=]]> NOW()
-                    ORDER BY mr.is_top DESC, mr.start_time DESC, mr.id DESC
-                    LIMIT 1
-                ),
-                lp.recommend_reason
-            ) AS recommendReason,
-            lp.weight,
-            m.name AS merchantName,
-            c.name AS canteenName,
-            c.type AS canteenType,
-            s.name AS stallName
-        <include refid="BaseLotteryFrom"/>
-        <include refid="BaseLotteryWhere"/>
         ORDER BY lp.weight DESC, lp.id DESC
     </select>
 
-    <select id="selectDishTags" resultType="com.eatnow.backend.lottery.vo.LotteryTagRelationVo">
-        SELECT
-            dt.dish_id AS sourceId,
-            t.name AS tagName
-        FROM dish_tag dt
-        INNER JOIN tag t ON t.id = dt.tag_id
-        WHERE dt.dish_id IN
-        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
-            #{dishId}
-        </foreach>
-          AND t.status = 'ACTIVE'
-        ORDER BY t.sort_order ASC, t.id ASC
+    <select id="selectSourceTags" resultType="com.eatnow.backend.lottery.vo.LotteryTagRelationVo">
+        <choose>
+            <when test="sourceType == 'POST'">
+                SELECT
+                    spt.post_id AS sourceId,
+                    t.name AS tagName
+                FROM student_post_tag spt
+                INNER JOIN tag t ON t.id = spt.tag_id
+                WHERE spt.post_id IN
+                <foreach collection="sourceIds" item="sourceId" open="(" separator="," close=")">
+                    #{sourceId}
+                </foreach>
+                  AND t.status = 'ACTIVE'
+                ORDER BY t.sort_order ASC, t.id ASC
+            </when>
+            <otherwise>
+                SELECT
+                    dt.dish_id AS sourceId,
+                    t.name AS tagName
+                FROM dish_tag dt
+                INNER JOIN tag t ON t.id = dt.tag_id
+                WHERE dt.dish_id IN
+                <foreach collection="sourceIds" item="sourceId" open="(" separator="," close=")">
+                    #{sourceId}
+                </foreach>
+                  AND t.status = 'ACTIVE'
+                ORDER BY t.sort_order ASC, t.id ASC
+            </otherwise>
+        </choose>
     </select>
 
-    <select id="selectDishImages" resultType="com.eatnow.backend.lottery.vo.LotteryImageRelationVo">
-        SELECT
-            di.dish_id AS sourceId,
-            di.image_url AS imageUrl
-        FROM dish_image di
-        WHERE di.dish_id IN
-        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
-            #{dishId}
-        </foreach>
-        ORDER BY di.is_cover DESC, di.sort_order ASC, di.id ASC
+    <select id="selectSourceImages" resultType="com.eatnow.backend.lottery.vo.LotteryImageRelationVo">
+        <choose>
+            <when test="sourceType == 'POST'">
+                SELECT
+                    post_id AS sourceId,
+                    image_url AS imageUrl
+                FROM student_post_image
+                WHERE post_id IN
+                <foreach collection="sourceIds" item="sourceId" open="(" separator="," close=")">
+                    #{sourceId}
+                </foreach>
+                ORDER BY sort_order ASC, id ASC
+            </when>
+            <otherwise>
+                SELECT
+                    di.dish_id AS sourceId,
+                    di.image_url AS imageUrl
+                FROM dish_image di
+                WHERE di.dish_id IN
+                <foreach collection="sourceIds" item="sourceId" open="(" separator="," close=")">
+                    #{sourceId}
+                </foreach>
+                ORDER BY di.is_cover DESC, di.sort_order ASC, di.id ASC
+            </otherwise>
+        </choose>
     </select>
 </mapper>

@@ -9,7 +9,7 @@
       </view>
 
       <view class="search" @tap="goDishes">
-        <text class="search-icon">⌕</text>
+        <view class="search-icon"></view>
         <text class="search-placeholder">搜菜名、窗口、口味标签</text>
       </view>
 
@@ -28,6 +28,17 @@
           <view class="bento-dot bento-three"></view>
         </view>
       </view>
+    </view>
+
+    <view class="ai-entry" @tap="goAiRecommend">
+      <view class="ai-entry-mark">
+        <text>AI</text>
+      </view>
+      <view class="ai-entry-copy">
+        <text class="ai-entry-title">聊聊再点餐</text>
+        <text class="ai-entry-subtitle">先补充口味和预算，准备好了再推荐菜品。</text>
+      </view>
+      <view class="ai-entry-arrow"></view>
     </view>
 
     <view class="quick-grid">
@@ -57,7 +68,10 @@
       <scroll-view scroll-x class="dish-scroll" show-scrollbar="false">
         <view class="dish-row">
           <view v-for="dish in hotDishes" :key="dish.id" class="dish-card" @tap="goDetail(dish.id)">
-            <view class="food-art dish-art"><text>{{ shortName(dish.name) }}</text></view>
+            <view class="food-art dish-art">
+              <image v-if="dishImage(dish)" :src="dishImage(dish)" mode="aspectFill" />
+              <text v-else>{{ shortName(dish.name) }}</text>
+            </view>
             <view class="dish-body">
               <text class="dish-name">{{ dish.name }}</text>
               <text class="dish-place">{{ dish.canteenName }} · {{ dish.stallName }}</text>
@@ -92,6 +106,7 @@
 
 <script>
 import { fetchDishes, fetchRanking } from '../../services/student.js'
+import { assetUrl } from '../../utils/request.js'
 
 export default {
   data() {
@@ -115,6 +130,10 @@ export default {
     shortName(name) {
       return name.slice(0, 2)
     },
+    dishImage(dish) {
+      const image = dish && dish.images && dish.images.length ? dish.images[0] : dish.coverImageUrl
+      return assetUrl(image)
+    },
     goLottery() {
       uni.switchTab({ url: '/pages/lottery/index' })
     },
@@ -129,6 +148,9 @@ export default {
     },
     goRanking(type) {
       uni.navigateTo({ url: `/pages/dishes/index?ranking=${type}` })
+    },
+    goAiRecommend() {
+      uni.navigateTo({ url: '/pages/ai-recommend/index' })
     },
     goMerchant() {
       uni.navigateTo({ url: '/pages/merchant/index/index' })
@@ -180,13 +202,11 @@ export default {
 }
 
 .search-icon {
-  color: #e94b35;
-  font-size: 38rpx;
-  font-weight: 900;
+  font-size: 0;
 }
 
 .search-placeholder {
-  margin-left: 14rpx;
+  margin-left: 0;
   color: #9d8466;
   font-size: 27rpx;
 }
@@ -290,6 +310,60 @@ export default {
   margin-top: 24rpx;
 }
 
+.ai-entry {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 128rpx;
+  margin-top: 22rpx;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(135deg, rgba(36, 24, 17, 0.96), rgba(93, 74, 59, 0.96));
+  box-shadow: 0 18rpx 34rpx rgba(36, 24, 17, 0.16);
+}
+
+.ai-entry-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 72rpx;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 14rpx;
+  background: #ffd64e;
+  color: #241811;
+  font-size: 26rpx;
+  font-weight: 900;
+}
+
+.ai-entry-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-entry-title {
+  display: block;
+  color: #fffdf7;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.ai-entry-subtitle {
+  display: block;
+  margin-top: 6rpx;
+  color: rgba(255, 253, 247, 0.7);
+  font-size: 22rpx;
+  line-height: 1.35;
+}
+
+.ai-entry-arrow {
+  width: 22rpx;
+  height: 22rpx;
+  border-top: 5rpx solid #ffd64e;
+  border-right: 5rpx solid #ffd64e;
+  transform: rotate(45deg);
+}
+
 .quick-item {
   flex: 1;
   min-height: 136rpx;
@@ -354,6 +428,20 @@ export default {
   color: #fffdf7;
   font-size: 42rpx;
   font-weight: 900;
+}
+
+.dish-art image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.dish-art text {
+  position: relative;
+  z-index: 1;
 }
 
 .dish-body {

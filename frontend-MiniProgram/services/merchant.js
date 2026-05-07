@@ -63,11 +63,7 @@ export function fetchMerchantFeedbackDishes(limit = 5) {
 }
 
 export async function fetchMerchantDishes(params = {}) {
-  const finalParams = { ...params }
-  if (!finalParams.merchantId) {
-    const profile = await fetchMerchantProfile()
-    finalParams.merchantId = profile.id
-  }
+  const finalParams = { ...params, manage: true }
   return request({ url: '/api/v1/dishes', auth: true, params: finalParams })
 }
 
@@ -97,6 +93,10 @@ export function fetchTags() {
 
 export function fetchMerchantRecommendations(params = {}) {
   return request({ url: '/api/v1/merchant-recommendations', auth: true, params })
+}
+
+export function chatWithMerchantLlmRecommendation(payload) {
+  return request({ url: '/api/v1/llm-recommendations/merchant-chat', method: 'POST', auth: true, data: payload })
 }
 
 export function createRecommendation(payload) {

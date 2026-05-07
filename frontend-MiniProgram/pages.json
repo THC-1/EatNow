@@ -26,9 +26,35 @@
       }
     },
     {
+      "path": "pages/posts/index",
+      "style": {
+        "navigationBarTitleText": "同学分享",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/post-detail/index",
+      "style": {
+        "navigationBarTitleText": "分享详情"
+      }
+    },
+    {
+      "path": "pages/post-editor/index",
+      "style": {
+        "navigationBarTitleText": "发布分享"
+      }
+    },
+    {
       "path": "pages/lottery/index",
       "style": {
         "navigationBarTitleText": "今天吃什么"
+      }
+    },
+    {
+      "path": "pages/ai-recommend/index",
+      "style": {
+        "navigationBarTitleText": "AI 点餐",
+        "navigationStyle": "custom"
       }
     },
     {
@@ -82,19 +108,33 @@
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "首页"
+        "text": "首页",
+        "iconPath": "static/tabbar/home.png",
+        "selectedIconPath": "static/tabbar/home-active.png"
       },
       {
         "pagePath": "pages/canteens/index",
-        "text": "食堂"
+        "text": "食堂",
+        "iconPath": "static/tabbar/canteen.png",
+        "selectedIconPath": "static/tabbar/canteen-active.png"
       },
       {
         "pagePath": "pages/lottery/index",
-        "text": "抽签"
+        "text": "抽签",
+        "iconPath": "static/tabbar/lottery.png",
+        "selectedIconPath": "static/tabbar/lottery-active.png"
+      },
+      {
+        "pagePath": "pages/posts/index",
+        "text": "分享",
+        "iconPath": "static/tabbar/share.png",
+        "selectedIconPath": "static/tabbar/share-active.png"
       },
       {
         "pagePath": "pages/mine/index",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "static/tabbar/mine.png",
+        "selectedIconPath": "static/tabbar/mine-active.png"
       }
     ]
   },

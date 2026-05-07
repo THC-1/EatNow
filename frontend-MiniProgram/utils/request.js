@@ -1,6 +1,16 @@
-const BASE_URL = 'http://10.207.122.19:8080'
+const BASE_URL = 'http://localhost:8080'
 const OLD_PLACEHOLDER_TOKENS = [`mo${'ck'}-token`, `mo${'ck'}-merchant-token`]
 let refreshingPromise = null
+
+export function assetUrl(path) {
+  if (!path || typeof path !== 'string') {
+    return ''
+  }
+  if (/^(https?:)?\/\//.test(path) || path.startsWith('data:') || path.startsWith('wxfile://')) {
+    return path
+  }
+  return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
 
 function buildUrl(path, params = {}) {
   const query = Object.keys(params)
@@ -147,7 +157,11 @@ export function uploadImage(filePath, type = 'dish', skipRefresh = false) {
       success(res) {
         const body = parseResponseBody(res.data)
         if (res.statusCode >= 200 && res.statusCode < 300 && (body.code === 200 || body.code === undefined)) {
-          resolve(body.data === undefined ? body : body.data)
+          const data = body.data === undefined ? body : body.data
+          if (data && data.url) {
+            data.url = assetUrl(data.url)
+          }
+          resolve(data)
           return
         }
         if (res.statusCode === 401 && !skipRefresh) {

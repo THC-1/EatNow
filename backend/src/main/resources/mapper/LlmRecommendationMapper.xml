@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.llmrecommendation.mapper.LlmRecommendationMapper">
+
+    <sql id="PublicDishJoins">
+        FROM dish d
+        INNER JOIN merchant m ON m.id = d.merchant_id
+        INNER JOIN stall s ON s.id = d.stall_id
+        INNER JOIN canteen c ON c.id = d.canteen_id
+        LEFT JOIN category cg ON cg.id = d.category_id
+    </sql>
+
+    <sql id="PublicOnSaleDishWhere">
+        WHERE d.status = 'ON_SALE'
+          AND m.apply_status = 'APPROVED'
+          AND m.status = 'OPEN'
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+    </sql>
+
+    <sql id="CandidateSelect">
+        SELECT
+            d.id AS dishId,
+            d.merchant_id AS merchantId,
+            m.name AS merchantName,
+            d.canteen_id AS canteenId,
+            c.name AS canteenName,
+            d.stall_id AS stallId,
+            s.name AS stallName,
+            d.category_id AS categoryId,
+            cg.name AS categoryName,
+            d.name,
+            d.description,
+            d.price,
+            d.average_score AS score,
+            d.taste_score AS tasteScore,
+            d.portion_score AS portionScore,
+            d.value_score AS valueScore,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS commentCount,
+            d.cover_image_url AS coverImageUrl,
+            (
+                SELECT mr.recommend_reason
+                FROM merchant_recommendation mr
+                WHERE mr.dish_id = d.id
+                  AND mr.status = 'ACTIVE'
+                  AND mr.start_time <![CDATA[<=]]> NOW()
+                  AND mr.end_time <![CDATA[>=]]> NOW()
+                ORDER BY mr.is_top DESC, mr.start_time DESC, mr.id DESC
+                LIMIT 1
+            ) AS currentRecommendReason,
+            (
+                SELECT mr.recommend_type
+                FROM merchant_recommendation mr
+                WHERE mr.dish_id = d.id
+                  AND mr.status = 'ACTIVE'
+                  AND mr.start_time <![CDATA[<=]]> NOW()
+                  AND mr.end_time <![CDATA[>=]]> NOW()
+                ORDER BY mr.is_top DESC, mr.start_time DESC, mr.id DESC
+                LIMIT 1
+            ) AS currentRecommendType,
+            d.created_at AS createdAt
+    </sql>
+
+    <select id="selectUserPreferenceSnapshot" resultType="com.eatnow.backend.llmrecommendation.vo.LlmUserPreferenceSnapshotVo">
+        SELECT
+            user_id AS userId,
+            default_canteen_id AS defaultCanteenId,
+            default_canteen_type AS defaultCanteenType,
+            min_price AS minPrice,
+            max_price AS maxPrice,
+            taste_preference AS tastePreference,
+            avoid_tags AS avoidTags
+        FROM user_preference
+        WHERE user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <select id="selectUserTagSignals" resultType="com.eatnow.backend.llmrecommendation.vo.LlmSignalWeightVo">
+        SELECT tag_id AS id, tag_name AS name, SUM(signal_weight) AS weight
+        FROM (
+            SELECT t.id AS tag_id, t.name AS tag_name, 5.0 AS signal_weight
+            FROM favorite f
+            INNER JOIN dish_tag dt ON dt.dish_id = f.target_id
+            INNER JOIN tag t ON t.id = dt.tag_id
+            WHERE f.user_id = #{userId}
+              AND f.target_type = 'DISH'
+              AND t.status = 'ACTIVE'
+            UNION ALL
+            SELECT t.id AS tag_id, t.name AS tag_name, 3.0 AS signal_weight
+            FROM eat_list el
+            INNER JOIN dish_tag dt ON dt.dish_id = el.dish_id
+            INNER JOIN tag t ON t.id = dt.tag_id
+            WHERE el.user_id = #{userId}
+              AND el.status IN ('WANT_TO_EAT', 'EATEN')
+              AND t.status = 'ACTIVE'
+            UNION ALL
+            SELECT t.id AS tag_id, t.name AS tag_name, 4.0 AS signal_weight
+            FROM review r
+            INNER JOIN dish_tag dt ON dt.dish_id = r.dish_id
+            INNER JOIN tag t ON t.id = dt.tag_id
+            WHERE r.user_id = #{userId}
+              AND r.status = 'VISIBLE'
+              AND r.overall_score <![CDATA[>=]]> 4.00
+              AND t.status = 'ACTIVE'
+            UNION ALL
+            SELECT t.id AS tag_id, t.name AS tag_name, 2.0 AS signal_weight
+            FROM lottery_record lr
+            INNER JOIN dish_tag dt ON dt.dish_id = lr.source_id
+            INNER JOIN tag t ON t.id = dt.tag_id
+            WHERE lr.user_id = #{userId}
+              AND lr.source_type = 'DISH'
+              AND lr.result_action IN ('ACCEPT', 'FAVORITE')
+              AND t.status = 'ACTIVE'
+        ) signals
+        GROUP BY tag_id, tag_name
+        ORDER BY weight DESC, tag_id ASC
+        LIMIT 20
+    </select>
+
+    <select id="selectUserCategorySignals" resultType="com.eatnow.backend.llmrecommendation.vo.LlmSignalWeightVo">
+        SELECT category_id AS id, category_name AS name, SUM(signal_weight) AS weight
+        FROM (
+            SELECT d.category_id, cg.name AS category_name, 5.0 AS signal_weight
+            FROM favorite f
+            INNER JOIN dish d ON d.id = f.target_id
+            LEFT JOIN category cg ON cg.id = d.category_id
+            WHERE f.user_id = #{userId}
+              AND f.target_type = 'DISH'
+              AND d.category_id IS NOT NULL
+            UNION ALL
+            SELECT d.category_id, cg.name AS category_name, 3.0 AS signal_weight
+            FROM eat_list el
+            INNER JOIN dish d ON d.id = el.dish_id
+            LEFT JOIN category cg ON cg.id = d.category_id
+            WHERE el.user_id = #{userId}
+              AND el.status IN ('WANT_TO_EAT', 'EATEN')
+              AND d.category_id IS NOT NULL
+            UNION ALL
+            SELECT d.category_id, cg.name AS category_name, 4.0 AS signal_weight
+            FROM review r
+            INNER JOIN dish d ON d.id = r.dish_id
+            LEFT JOIN category cg ON cg.id = d.category_id
+            WHERE r.user_id = #{userId}
+              AND r.status = 'VISIBLE'
+              AND r.overall_score <![CDATA[>=]]> 4.00
+              AND d.category_id IS NOT NULL
+        ) signals
+        GROUP BY category_id, category_name
+        ORDER BY weight DESC, category_id ASC
+        LIMIT 10
+    </select>
+
+    <select id="selectUserCanteenSignals" resultType="com.eatnow.backend.llmrecommendation.vo.LlmSignalWeightVo">
+        SELECT canteen_id AS id, canteen_name AS name, SUM(signal_weight) AS weight
+        FROM (
+            SELECT d.canteen_id, c.name AS canteen_name, 5.0 AS signal_weight
+            FROM favorite f
+            INNER JOIN dish d ON d.id = f.target_id
+            INNER JOIN canteen c ON c.id = d.canteen_id
+            WHERE f.user_id = #{userId}
+              AND f.target_type = 'DISH'
+            UNION ALL
+            SELECT d.canteen_id, c.name AS canteen_name, 3.0 AS signal_weight
+            FROM eat_list el
+            INNER JOIN dish d ON d.id = el.dish_id
+            INNER JOIN canteen c ON c.id = d.canteen_id
+            WHERE el.user_id = #{userId}
+              AND el.status IN ('WANT_TO_EAT', 'EATEN')
+            UNION ALL
+            SELECT d.canteen_id, c.name AS canteen_name, 4.0 AS signal_weight
+            FROM review r
+            INNER JOIN dish d ON d.id = r.dish_id
+            INNER JOIN canteen c ON c.id = d.canteen_id
+            WHERE r.user_id = #{userId}
+              AND r.status = 'VISIBLE'
+              AND r.overall_score <![CDATA[>=]]> 4.00
+        ) signals
+        GROUP BY canteen_id, canteen_name
+        ORDER BY weight DESC, canteen_id ASC
+        LIMIT 10
+    </select>
+
+    <select id="selectUserAveragePositivePrice" resultType="java.math.BigDecimal">
+        SELECT AVG(price)
+        FROM (
+            SELECT d.price
+            FROM favorite f
+            INNER JOIN dish d ON d.id = f.target_id
+            WHERE f.user_id = #{userId}
+              AND f.target_type = 'DISH'
+            UNION ALL
+            SELECT d.price
+            FROM eat_list el
+            INNER JOIN dish d ON d.id = el.dish_id
+            WHERE el.user_id = #{userId}
+              AND el.status IN ('WANT_TO_EAT', 'EATEN')
+            UNION ALL
+            SELECT d.price
+            FROM review r
+            INNER JOIN dish d ON d.id = r.dish_id
+            WHERE r.user_id = #{userId}
+              AND r.status = 'VISIBLE'
+              AND r.overall_score <![CDATA[>=]]> 4.00
+        ) prices
+    </select>
+
+    <select id="selectUserFavoriteDishNames" resultType="java.lang.String">
+        SELECT d.name
+        FROM favorite f
+        INNER JOIN dish d ON d.id = f.target_id
+        WHERE f.user_id = #{userId}
+          AND f.target_type = 'DISH'
+        ORDER BY f.created_at DESC
+        LIMIT 20
+    </select>
+
+    <select id="selectUserEatenDishNames" resultType="java.lang.String">
+        SELECT d.name
+        FROM eat_list el
+        INNER JOIN dish d ON d.id = el.dish_id
+        WHERE el.user_id = #{userId}
+          AND el.status = 'EATEN'
+        ORDER BY COALESCE(el.eaten_at, el.updated_at, el.created_at) DESC
+        LIMIT 20
+    </select>
+
+    <select id="selectUserHighRatedDishNames" resultType="java.lang.String">
+        SELECT d.name
+        FROM review r
+        INNER JOIN dish d ON d.id = r.dish_id
+        WHERE r.user_id = #{userId}
+          AND r.status = 'VISIBLE'
+          AND r.overall_score <![CDATA[>=]]> 4.00
+        ORDER BY r.overall_score DESC, r.created_at DESC
+        LIMIT 20
+    </select>
+
+    <select id="selectAvailableCandidateDishes" resultType="com.eatnow.backend.llmrecommendation.vo.LlmCandidateDishVo">
+        <include refid="CandidateSelect"/>
+        <include refid="PublicDishJoins"/>
+        <include refid="PublicOnSaleDishWhere"/>
+        <if test="constraints != null and constraints.canteenId != null">
+            AND d.canteen_id = #{constraints.canteenId}
+        </if>
+        <if test="constraints != null and constraints.categoryId != null">
+            AND d.category_id = #{constraints.categoryId}
+        </if>
+        <if test="constraints != null and constraints.minPrice != null">
+            AND d.price <![CDATA[>=]]> #{constraints.minPrice}
+        </if>
+        <if test="constraints != null and constraints.maxPrice != null">
+            AND d.price <![CDATA[<=]]> #{constraints.maxPrice}
+        </if>
+        <if test="constraints != null and constraints.tagIds != null and constraints.tagIds.size() > 0">
+            AND EXISTS (
+                SELECT 1
+                FROM dish_tag dt
+                WHERE dt.dish_id = d.id
+                  AND dt.tag_id IN
+                  <foreach collection="constraints.tagIds" item="tagId" open="(" separator="," close=")">
+                      #{tagId}
+                  </foreach>
+            )
+        </if>
+        ORDER BY (d.favorite_count * 3 + d.review_count * 2 + d.view_count) DESC, d.average_score DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectPopularCandidateDishes" resultType="com.eatnow.backend.llmrecommendation.vo.LlmCandidateDishVo">
+        <include refid="CandidateSelect"/>
+        <include refid="PublicDishJoins"/>
+        <include refid="PublicOnSaleDishWhere"/>
+        ORDER BY (d.favorite_count * 3 + d.review_count * 2 + d.view_count) DESC, d.average_score DESC, d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectDishImages" resultType="com.eatnow.backend.llmrecommendation.vo.LlmDishImageRelationVo">
+        SELECT
+            di.dish_id AS dishId,
+            di.image_url AS imageUrl
+        FROM dish_image di
+        WHERE di.dish_id IN
+        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
+            #{dishId}
+        </foreach>
+        ORDER BY di.is_cover DESC, di.sort_order ASC, di.id ASC
+    </select>
+
+    <select id="selectDishTags" resultType="com.eatnow.backend.llmrecommendation.vo.LlmDishTagRelationVo">
+        SELECT
+            dt.dish_id AS dishId,
+            t.id AS tagId,
+            t.name AS tagName
+        FROM dish_tag dt
+        INNER JOIN tag t ON t.id = dt.tag_id
+        WHERE dt.dish_id IN
+        <foreach collection="dishIds" item="dishId" open="(" separator="," close=")">
+            #{dishId}
+        </foreach>
+          AND t.status = 'ACTIVE'
+        ORDER BY t.sort_order ASC, t.id ASC
+    </select>
+</mapper>

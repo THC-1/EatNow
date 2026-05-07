@@ -47,6 +47,7 @@ public class LotteryService {
     private static final String DRAW_MODE_CONDITION = "CONDITION";
     private static final String DRAW_MODE_FAVORITE = "FAVORITE";
     private static final String SOURCE_TYPE_DISH = "DISH";
+    private static final String SOURCE_TYPE_POST = "POST";
 
     private final LotteryRuleMapper lotteryRuleMapper;
     private final LotteryPoolMapper lotteryPoolMapper;
@@ -121,8 +122,9 @@ public class LotteryService {
                         .set(LotteryRecord::getActionAt, LocalDateTime.now())
         );
 
-        if ("FAVORITE".equals(resultAction) && SOURCE_TYPE_DISH.equals(record.getSourceType())) {
-            favoriteService.createFavoriteIfAbsent(userId, SOURCE_TYPE_DISH, record.getSourceId());
+        if ("FAVORITE".equals(resultAction)
+                && (SOURCE_TYPE_DISH.equals(record.getSourceType()) || SOURCE_TYPE_POST.equals(record.getSourceType()))) {
+            favoriteService.createFavoriteIfAbsent(userId, record.getSourceType(), record.getSourceId());
         }
     }
 
@@ -179,7 +181,8 @@ public class LotteryService {
             lotteryCandidate.setPrice(candidate.getPrice());
             lotteryCandidate.setScore(candidate.getScore());
             lotteryCandidate.setSortOrder(i);
-            lotteryCandidate.setIsSelected(candidate.getSourceId().equals(selected.getSourceId()));
+            lotteryCandidate.setIsSelected(candidate.getSourceId().equals(selected.getSourceId())
+                    && candidate.getSourceType().equals(selected.getSourceType()));
             lotteryCandidateMapper.insert(lotteryCandidate);
         }
 
@@ -198,8 +201,10 @@ public class LotteryService {
         resultVo.setPrice(selected.getPrice());
         resultVo.setScore(selected.getScore());
         resultVo.setRecommendReason(selected.getRecommendReason());
-        resultVo.setTags(buildTagMap(List.of(selected.getSourceId())).getOrDefault(selected.getSourceId(), Collections.emptyList()));
-        resultVo.setImages(buildImageMap(List.of(selected.getSourceId())).getOrDefault(selected.getSourceId(), buildFallbackImages(selected)));
+        resultVo.setTags(buildTagMap(selected.getSourceType(), List.of(selected.getSourceId()))
+                .getOrDefault(selected.getSourceId(), Collections.emptyList()));
+        resultVo.setImages(buildImageMap(selected.getSourceType(), List.of(selected.getSourceId()))
+                .getOrDefault(selected.getSourceId(), buildFallbackImages(selected)));
         return resultVo;
     }
 
@@ -210,8 +215,8 @@ public class LotteryService {
         return List.of(selected.getCoverImageUrl());
     }
 
-    private Map<Long, List<String>> buildTagMap(List<Long> dishIds) {
-        List<LotteryTagRelationVo> relations = lotteryPoolMapper.selectDishTags(dishIds);
+    private Map<Long, List<String>> buildTagMap(String sourceType, List<Long> sourceIds) {
+        List<LotteryTagRelationVo> relations = lotteryPoolMapper.selectSourceTags(sourceType, sourceIds);
         Map<Long, List<String>> tagMap = new LinkedHashMap<>();
         for (LotteryTagRelationVo relation : relations) {
             tagMap.computeIfAbsent(relation.getSourceId(), key -> new ArrayList<>()).add(relation.getTagName());
@@ -219,8 +224,8 @@ public class LotteryService {
         return tagMap;
     }
 
-    private Map<Long, List<String>> buildImageMap(List<Long> dishIds) {
-        List<LotteryImageRelationVo> relations = lotteryPoolMapper.selectDishImages(dishIds);
+    private Map<Long, List<String>> buildImageMap(String sourceType, List<Long> sourceIds) {
+        List<LotteryImageRelationVo> relations = lotteryPoolMapper.selectSourceImages(sourceType, sourceIds);
         Map<Long, List<String>> imageMap = new LinkedHashMap<>();
         for (LotteryImageRelationVo relation : relations) {
             imageMap.computeIfAbsent(relation.getSourceId(), key -> new ArrayList<>()).add(relation.getImageUrl());

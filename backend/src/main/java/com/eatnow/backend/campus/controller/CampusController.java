@@ -1,6 +1,7 @@
 package com.eatnow.backend.campus.controller;
 
 import com.eatnow.backend.campus.service.CampusQueryService;
+import com.eatnow.backend.campus.vo.CampusPlaceSearchVo;
 import com.eatnow.backend.campus.vo.CanteenDetailVo;
 import com.eatnow.backend.campus.vo.CanteenListVo;
 import com.eatnow.backend.campus.vo.StallDetailVo;
@@ -37,6 +38,14 @@ public class CampusController {
     @GetMapping("/canteens/{id}")
     public ApiResponse<CanteenDetailVo> getCanteenDetail(@PathVariable Long id) {
         return ApiResponse.success(campusQueryService.getCanteenDetail(id));
+    }
+
+    @GetMapping("/places/search")
+    public ApiResponse<List<CampusPlaceSearchVo>> searchPlaces(
+            @RequestParam String keyword,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return ApiResponse.success(campusQueryService.searchPlaces(keyword, limit));
     }
 
     @GetMapping("/stalls")

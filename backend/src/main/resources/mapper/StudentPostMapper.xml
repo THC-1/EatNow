@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.eatnow.backend.post.mapper.StudentPostMapper">
+
+    <sql id="PostBaseJoins">
+        FROM student_post sp
+        INNER JOIN sys_user su ON su.id = sp.user_id
+        LEFT JOIN stall s ON s.id = sp.stall_id
+        LEFT JOIN canteen c ON c.id = sp.canteen_id
+        LEFT JOIN canteen sc ON sc.id = s.canteen_id
+        LEFT JOIN category cg ON cg.id = sp.category_id
+    </sql>
+
+    <sql id="PostVisibleFilters">
+        WHERE sp.status = 'PUBLISHED'
+          AND su.status = 'ACTIVE'
+        <if test="keyword != null and keyword != ''">
+            AND (
+                sp.title LIKE CONCAT('%', #{keyword}, '%')
+                OR sp.dish_name LIKE CONCAT('%', #{keyword}, '%')
+                OR sp.shop_name LIKE CONCAT('%', #{keyword}, '%')
+                OR sp.content LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="canteenId != null">
+            AND sp.canteen_id = #{canteenId}
+        </if>
+        <if test="stallId != null">
+            AND sp.stall_id = #{stallId}
+        </if>
+        <if test="categoryId != null">
+            AND sp.category_id = #{categoryId}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (
+                SELECT 1
+                FROM student_post_tag spt
+                WHERE spt.post_id = sp.id
+                  AND spt.tag_id = #{tagId}
+            )
+        </if>
+    </sql>
+
+    <sql id="PostColumns">
+        sp.id,
+        sp.user_id AS userId,
+        su.nickname AS userNickname,
+        su.avatar_url AS userAvatar,
+        COALESCE(sp.canteen_id, s.canteen_id) AS canteenId,
+        COALESCE(c.name, sc.name) AS canteenName,
+        COALESCE(c.type, sc.type) AS canteenType,
+        sp.stall_id AS stallId,
+        s.name AS stallName,
+        sp.category_id AS categoryId,
+        cg.name AS categoryName,
+        sp.title,
+        sp.dish_name AS foodName,
+        sp.shop_name AS shopName,
+        sp.content,
+        sp.price,
+        sp.score,
+        sp.cover_image_url AS coverImageUrl,
+        sp.is_join_lottery AS isJoinLottery,
+        sp.view_count AS viewCount,
+        sp.like_count AS likeCount,
+        sp.favorite_count AS favoriteCount,
+        sp.comment_count AS commentCount,
+        sp.status,
+        sp.created_at AS createdAt,
+        sp.updated_at AS updatedAt
+    </sql>
+
+    <select id="countPosts" resultType="long">
+        SELECT COUNT(1)
+        <include refid="PostBaseJoins"/>
+        <include refid="PostVisibleFilters"/>
+    </select>
+
+    <select id="selectPostList" resultType="com.eatnow.backend.post.vo.PostItemVo">
+        SELECT
+        <include refid="PostColumns"/>
+        <include refid="PostBaseJoins"/>
+        <include refid="PostVisibleFilters"/>
+        <choose>
+            <when test="sortBy == 'popular'">
+                ORDER BY sp.like_count DESC, sp.favorite_count DESC, sp.id DESC
+            </when>
+            <otherwise>
+                ORDER BY sp.created_at DESC, sp.id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectPostDetail" resultType="com.eatnow.backend.post.vo.PostItemVo">
+        SELECT
+        <include refid="PostColumns"/>
+        <include refid="PostBaseJoins"/>
+        WHERE sp.id = #{id}
+          AND sp.status = 'PUBLISHED'
+          AND su.status = 'ACTIVE'
+        LIMIT 1
+    </select>
+
+    <select id="countMyPosts" resultType="long">
+        SELECT COUNT(1)
+        FROM student_post
+        WHERE user_id = #{userId}
+          AND status != 'DELETED'
+    </select>
+
+    <select id="selectMyPostList" resultType="com.eatnow.backend.post.vo.PostItemVo">
+        SELECT
+        <include refid="PostColumns"/>
+        <include refid="PostBaseJoins"/>
+        WHERE sp.user_id = #{userId}
+          AND sp.status != 'DELETED'
+        ORDER BY sp.created_at DESC, sp.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="selectPostImages" resultType="com.eatnow.backend.post.vo.PostImageRelationVo">
+        SELECT
+            post_id AS postId,
+            image_url AS imageUrl
+        FROM student_post_image
+        WHERE post_id IN
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">
+            #{postId}
+        </foreach>
+        ORDER BY post_id ASC, sort_order ASC, id ASC
+    </select>
+
+    <select id="selectPostTags" resultType="com.eatnow.backend.post.vo.PostTagRelationVo">
+        SELECT
+            spt.post_id AS postId,
+            t.id AS tagId,
+            t.name AS tagName
+        FROM student_post_tag spt
+        INNER JOIN tag t ON t.id = spt.tag_id
+        WHERE spt.post_id IN
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">
+            #{postId}
+        </foreach>
+          AND t.status = 'ACTIVE'
+        ORDER BY spt.post_id ASC, t.sort_order ASC, t.id ASC
+    </select>
+
+    <select id="selectLikedPostIds" resultType="java.lang.Long">
+        SELECT post_id
+        FROM student_post_like
+        WHERE user_id = #{userId}
+          AND post_id IN
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">
+            #{postId}
+        </foreach>
+    </select>
+
+    <select id="countOpenCanteenById" resultType="int">
+        SELECT COUNT(1)
+        FROM canteen
+        WHERE id = #{id}
+          AND status = 'OPEN'
+    </select>
+
+    <select id="countOpenStallById" resultType="int">
+        SELECT COUNT(1)
+        FROM stall s
+        INNER JOIN canteen c ON c.id = s.canteen_id
+        WHERE s.id = #{id}
+          AND s.status = 'OPEN'
+          AND c.status = 'OPEN'
+        <if test="canteenId != null">
+            AND s.canteen_id = #{canteenId}
+        </if>
+    </select>
+
+    <select id="countActiveCategoryById" resultType="int">
+        SELECT COUNT(1)
+        FROM category
+        WHERE id = #{id}
+          AND status = 'ACTIVE'
+    </select>
+
+    <select id="countActiveTagsByIds" resultType="int">
+        SELECT COUNT(1)
+        FROM tag
+        WHERE id IN
+        <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+            #{tagId}
+        </foreach>
+          AND status = 'ACTIVE'
+    </select>
+
+    <update id="increaseViewCount">
+        UPDATE student_post
+        SET view_count = view_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="increaseLikeCount">
+        UPDATE student_post
+        SET like_count = like_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="decreaseLikeCount">
+        UPDATE student_post
+        SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deletePostImages">
+        DELETE FROM student_post_image
+        WHERE post_id = #{postId}
+    </delete>
+
+    <insert id="insertPostImages">
+        INSERT INTO student_post_image (post_id, image_url, sort_order)
+        VALUES
+        <foreach collection="images" item="image" index="index" separator=",">
+            (#{postId}, #{image}, #{index})
+        </foreach>
+    </insert>
+
+    <delete id="deletePostTags">
+        DELETE FROM student_post_tag
+        WHERE post_id = #{postId}
+    </delete>
+
+    <insert id="insertPostTags">
+        INSERT INTO student_post_tag (post_id, tag_id)
+        VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{postId}, #{tagId})
+        </foreach>
+    </insert>
+
+    <insert id="upsertPostLotteryPool">
+        INSERT INTO lottery_pool (
+            source_type,
+            source_id,
+            merchant_id,
+            canteen_id,
+            stall_id,
+            category_id,
+            title,
+            price,
+            score,
+            cover_image_url,
+            recommend_reason,
+            weight,
+            status
+        )
+        SELECT
+            'POST',
+            sp.id,
+            NULL,
+            COALESCE(sp.canteen_id, st.canteen_id),
+            sp.stall_id,
+            sp.category_id,
+            sp.dish_name,
+            sp.price,
+            sp.score,
+            sp.cover_image_url,
+            CONCAT('User post: ', sp.shop_name),
+            100,
+            CASE
+                WHEN sp.is_join_lottery = 1 AND sp.status = 'PUBLISHED' THEN 'ACTIVE'
+                ELSE 'INACTIVE'
+            END
+        FROM student_post sp
+        LEFT JOIN stall st ON st.id = sp.stall_id
+        WHERE sp.id = #{postId}
+        ON DUPLICATE KEY UPDATE
+            canteen_id = VALUES(canteen_id),
+            stall_id = VALUES(stall_id),
+            category_id = VALUES(category_id),
+            title = VALUES(title),
+            price = VALUES(price),
+            score = VALUES(score),
+            cover_image_url = VALUES(cover_image_url),
+            recommend_reason = VALUES(recommend_reason),
+            status = VALUES(status),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="updatePostLotteryPoolStatus">
+        UPDATE lottery_pool
+        SET status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE source_type = 'POST'
+          AND source_id = #{postId}
+    </update>
+</mapper>

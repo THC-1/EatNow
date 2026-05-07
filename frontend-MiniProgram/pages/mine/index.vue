@@ -2,12 +2,12 @@
   <view class="page mine-page">
     <view class="profile-card">
       <view class="avatar" @tap="chooseAvatar">
-        <image v-if="profile.avatar" :src="profile.avatar" mode="aspectFill" />
+        <image v-if="profile.avatar" :src="avatarUrl(profile.avatar)" mode="aspectFill" />
         <text v-else>{{ profile.nickname ? profile.nickname.slice(0, 1) : '饭' }}</text>
       </view>
       <view class="profile-info">
         <text class="nickname">{{ profile.nickname || '未登录同学' }}</text>
-        <text class="profile-sub">收藏、想吃和抽签记录都在这里</text>
+        <text class="profile-sub">收藏、想吃、抽签记录和分享都在这里</text>
       </view>
       <button v-if="!loggedIn" class="login-btn" :loading="isLoggingIn" :disabled="isLoggingIn" @tap="login">登录</button>
       <view v-else class="profile-actions">
@@ -29,11 +29,11 @@
       <view class="pref-grid">
         <view class="pref-item">
           <text>预算</text>
-          <text>¥{{ preferences.minPrice }}-{{ preferences.maxPrice }}</text>
+          <text>¥{{ preferences.minPrice || 0 }}-{{ preferences.maxPrice || 0 }}</text>
         </view>
         <view class="pref-item">
           <text>口味</text>
-          <text>{{ preferences.tastePreference }}</text>
+          <text>{{ preferences.tastePreference || '暂无' }}</text>
         </view>
         <view class="pref-item">
           <text>忌口</text>
@@ -95,45 +95,60 @@
     </view>
 
     <view v-if="loggedIn && activeTab === 'favorite'" class="list">
-      <view v-for="item in favorites" :key="item.id" class="mini-card" @tap="goDetail(item.targetId || item.dish.id)">
-        <view class="food-art mini-art"><text>{{ shortName(item.dish.name) }}</text></view>
+      <view v-for="item in favorites" :key="item.id" class="mini-card" @tap="goFavoriteDetail(item)">
+        <view class="food-art mini-art"><text>{{ shortName(favoriteTitle(item)) }}</text></view>
         <view class="mini-info">
-          <text class="mini-title">{{ item.dish.name }}</text>
-          <text class="mini-sub">{{ item.dish.canteenName }} · ¥{{ item.dish.price }}</text>
+          <text class="mini-title">{{ favoriteTitle(item) }}</text>
+          <text class="mini-sub">{{ favoriteSub(item) }}</text>
         </view>
         <button class="small-action danger" @tap.stop="removeFavorite(item.id)">取消</button>
       </view>
+      <view v-if="!favorites.length" class="empty">还没有收藏。</view>
     </view>
 
     <view v-if="loggedIn && activeTab === 'eatList'" class="list">
-      <view v-for="item in eatList" :key="item.id" class="mini-card" @tap="goDetail(item.dish.id)">
-        <view class="food-art mini-art"><text>{{ shortName(item.dish.name) }}</text></view>
+      <view v-for="item in eatList" :key="item.id" class="mini-card" @tap="goDetail(item.dish && item.dish.id)">
+        <view class="food-art mini-art"><text>{{ shortName(item.dish && item.dish.name) }}</text></view>
         <view class="mini-info">
-          <text class="mini-title">{{ item.dish.name }}</text>
-          <text class="mini-sub">想吃 · {{ item.dish.merchantName }}</text>
+          <text class="mini-title">{{ item.dish ? item.dish.name : '想吃菜品' }}</text>
+          <text class="mini-sub">想吃 · {{ item.dish ? item.dish.merchantName : '' }}</text>
         </view>
         <view class="item-actions">
           <button class="small-action" @tap.stop="markEaten(item.id)">已吃</button>
           <button class="small-action danger" @tap.stop="removeEatList(item.id)">移除</button>
         </view>
       </view>
+      <view v-if="!eatList.length" class="empty">想吃清单是空的。</view>
     </view>
 
     <view v-if="loggedIn && activeTab === 'history'" class="list">
-      <view v-for="item in history" :key="item.id" class="history-card">
+      <view v-for="item in history" :key="item.id" class="history-card" @tap="goLotteryDetail(item)">
         <view>
           <text class="mini-title">{{ item.title }}</text>
           <text class="mini-sub">{{ item.createdAt }} · {{ actionText(item.resultAction) }}</text>
         </view>
         <text class="history-price">¥{{ item.price }}</text>
       </view>
+      <view v-if="!history.length" class="empty">还没有抽签记录。</view>
+    </view>
+
+    <view v-if="loggedIn && activeTab === 'posts'" class="list">
+      <view v-for="post in myPosts" :key="post.id" class="mini-card" @tap="goPostDetail(post.id, true)">
+        <view class="food-art mini-art"><text>{{ shortName(post.foodName || post.title) }}</text></view>
+        <view class="mini-info">
+          <text class="mini-title">{{ post.title || post.foodName }}</text>
+          <text class="mini-sub">{{ post.shopName }} · {{ post.likeCount || 0 }} 赞</text>
+        </view>
+        <button class="small-action danger" @tap.stop="removePost(post.id)">删除</button>
+      </view>
+      <view v-if="!myPosts.length" class="empty">还没有发布过分享。</view>
     </view>
   </view>
 </template>
 
 <script>
-import { deleteEatList, deleteFavorite, fetchEatList, fetchFavorites, fetchLotteryRecords, fetchPreferences, fetchProfile, logout, markEatListEaten, studentLogin, updatePreferences, updateProfile, uploadStudentImage } from '../../services/student.js'
-import { hasToken } from '../../utils/request.js'
+import { deleteEatList, deleteFavorite, deletePost, fetchEatList, fetchFavorites, fetchLotteryRecords, fetchMyPosts, fetchPreferences, fetchProfile, logout, markEatListEaten, studentLogin, updatePreferences, updateProfile, uploadStudentImage } from '../../services/student.js'
+import { assetUrl, hasToken } from '../../utils/request.js'
 
 export default {
   data() {
@@ -159,11 +174,13 @@ export default {
       tabs: [
         { label: '收藏', value: 'favorite' },
         { label: '想吃', value: 'eatList' },
-        { label: '抽签', value: 'history' }
+        { label: '抽签', value: 'history' },
+        { label: '分享', value: 'posts' }
       ],
       favorites: [],
       eatList: [],
-      history: []
+      history: [],
+      myPosts: []
     }
   },
   onShow() {
@@ -180,6 +197,7 @@ export default {
         this.favorites = []
         this.eatList = []
         this.history = []
+        this.myPosts = []
         return
       }
       this.load()
@@ -201,16 +219,23 @@ export default {
         this.favorites = []
         this.eatList = []
         this.history = []
+        this.myPosts = []
         uni.showToast({ title: error.message || '加载失败', icon: 'none' })
         return false
       }
     },
     async loadLists() {
       if (!this.loggedIn) return
-      const [favorites, eatList, history] = await Promise.all([fetchFavorites(), fetchEatList(), fetchLotteryRecords()])
+      const [favorites, eatList, history, posts] = await Promise.all([
+        fetchFavorites({ size: 50 }),
+        fetchEatList(),
+        fetchLotteryRecords(),
+        fetchMyPosts({ size: 20 })
+      ])
       this.favorites = favorites.records || []
       this.eatList = eatList.records || []
       this.history = history.records || []
+      this.myPosts = posts.records || []
     },
     async login() {
       if (this.isLoggingIn) return
@@ -327,11 +352,66 @@ export default {
       this.eatList = this.eatList.filter((item) => item.id !== id)
       uni.showToast({ title: '已移除', icon: 'success' })
     },
+    removePost(id) {
+      uni.showModal({
+        title: '删除分享',
+        content: '确定删除这条分享吗？',
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            await deletePost(id)
+            this.myPosts = this.myPosts.filter((item) => item.id !== id)
+            uni.showToast({ title: '已删除', icon: 'success' })
+          } catch (error) {
+            uni.showToast({ title: error.message || '删除失败', icon: 'none' })
+          }
+        }
+      })
+    },
     shortName(name) {
       return name ? name.slice(0, 2) : '饭'
     },
+    avatarUrl(avatar) {
+      return assetUrl(avatar)
+    },
+    favoritePost(item) {
+      return item.post || item.share || item.studentPost || {}
+    },
+    favoriteTitle(item) {
+      if (item.targetType === 'POST') {
+        const post = this.favoritePost(item)
+        return post.title || post.foodName || '同学分享'
+      }
+      return item.dish ? item.dish.name : '菜品'
+    },
+    favoriteSub(item) {
+      if (item.targetType === 'POST') {
+        const post = this.favoritePost(item)
+        return `${post.shopName || '分享'} · ${post.likeCount || 0} 赞`
+      }
+      return item.dish ? `${item.dish.canteenName || ''} · ¥${item.dish.price || '-'}` : '菜品收藏'
+    },
+    goFavoriteDetail(item) {
+      if (item.targetType === 'POST') {
+        this.goPostDetail(item.targetId)
+        return
+      }
+      this.goDetail(item.targetId || (item.dish && item.dish.id))
+    },
+    goLotteryDetail(item) {
+      if (item.sourceType === 'POST') {
+        this.goPostDetail(item.sourceId)
+        return
+      }
+      this.goDetail(item.sourceId)
+    },
     goDetail(id) {
+      if (!id) return
       uni.navigateTo({ url: `/pages/dish-detail/index?id=${id}` })
+    },
+    goPostDetail(id, fromMine = false) {
+      if (!id) return
+      uni.navigateTo({ url: `/pages/post-detail/index?id=${id}${fromMine ? '&from=mine' : ''}` })
     },
     goMerchant() {
       uni.navigateTo({ url: '/pages/merchant/index/index' })
@@ -393,9 +473,6 @@ export default {
 }
 
 .login-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 106rpx;
   height: 62rpx;
   border-radius: 999rpx;
@@ -420,9 +497,11 @@ export default {
   gap: 10rpx;
 }
 
-.login-empty {
+.login-empty,
+.preference-card,
+.edit-card {
   margin-top: 22rpx;
-  padding: 28rpx;
+  padding: 24rpx;
   border-radius: 28rpx;
   background: #fffdf7;
   border: 2rpx solid rgba(43, 33, 24, 0.08);
@@ -441,22 +520,6 @@ export default {
   color: #8a7a68;
   font-size: 24rpx;
   line-height: 1.4;
-}
-
-.preference-card {
-  margin-top: 22rpx;
-  padding: 24rpx;
-  border-radius: 28rpx;
-  background: #fffdf7;
-  border: 2rpx solid rgba(43, 33, 24, 0.08);
-}
-
-.edit-card {
-  margin-top: 18rpx;
-  padding: 24rpx;
-  border-radius: 28rpx;
-  background: #fffdf7;
-  border: 2rpx solid rgba(43, 33, 24, 0.08);
 }
 
 .form-row {
@@ -556,20 +619,19 @@ export default {
 
 .tabs {
   display: flex;
-  gap: 14rpx;
+  gap: 12rpx;
   margin-top: 24rpx;
 }
 
 .tab {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   height: 68rpx;
   border-radius: 999rpx;
   background: #fffdf7;
   color: #8a7a68;
-  font-size: 25rpx;
+  text-align: center;
+  line-height: 68rpx;
+  font-size: 24rpx;
   font-weight: 900;
   border: 2rpx solid rgba(43, 33, 24, 0.08);
 }
@@ -641,6 +703,9 @@ export default {
   color: #241811;
   font-size: 28rpx;
   font-weight: 900;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .mini-sub {

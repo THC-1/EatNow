@@ -33,16 +33,17 @@
     </view>
 
     <button class="draw-btn" :class="{ spinning }" @tap="draw">
-      <text>{{ spinning ? '正在翻菜单' : '开抽' }}</text>
+      <text>{{ spinning ? '正在翻菜卡' : '开抽' }}</text>
     </button>
 
     <view v-if="result" class="result-card">
-      <view class="food-art result-art">
-        <text>{{ shortName(result.title) }}</text>
+      <view class="food-art result-art" @tap="goResultDetail">
+        <image v-if="resultImage(result)" :src="resultImage(result)" mode="aspectFill" />
+        <text v-else>{{ shortName(result.title) }}</text>
       </view>
       <view class="result-info">
         <text class="result-label">今天可以吃</text>
-        <text class="result-title">{{ result.title }}</text>
+        <text class="result-title" @tap="goResultDetail">{{ result.title }}</text>
         <text class="result-place">{{ result.canteenName }} · {{ result.merchantName }}</text>
         <text class="result-reason">{{ result.recommendReason }}</text>
         <view class="tag-row">
@@ -56,7 +57,7 @@
       <view class="action-row">
         <button class="ghost-btn" @tap="skip">再抽一次</button>
         <button class="ghost-btn" @tap="favorite">{{ resultFavorite.isFavorite ? '取消收藏' : '收藏' }}</button>
-        <button class="primary-btn" @tap="accept">就吃它</button>
+        <button class="primary-btn" @tap="accept">{{ result.sourceType === 'POST' ? '查看分享' : '就吃它' }}</button>
       </view>
     </view>
 
@@ -66,7 +67,7 @@
         <text class="section-link">最近</text>
       </view>
       <view class="history-list">
-        <view v-for="item in history" :key="item.id" class="history-item" @tap="goDetail(item.sourceId)">
+        <view v-for="item in history" :key="item.id" class="history-item" @tap="goDetail(item.sourceId, item.sourceType)">
           <view>
             <text class="history-title">{{ item.title }}</text>
             <text class="history-sub">{{ item.createdAt }} · {{ actionText(item.resultAction) }}</text>
@@ -74,13 +75,14 @@
           <text class="history-score">{{ item.score }}</text>
         </view>
       </view>
+      <view v-if="!history.length" class="empty">登录后可以看到最近抽过什么。</view>
     </view>
   </view>
 </template>
 
 <script>
 import { checkFavorite, createEatList, createFavorite, deleteFavorite, drawLottery, fetchFavorites, fetchLotteryRecords, recordLotteryAction } from '../../services/student.js'
-import { hasToken } from '../../utils/request.js'
+import { assetUrl, hasToken } from '../../utils/request.js'
 
 export default {
   data() {
@@ -154,6 +156,10 @@ export default {
     shortName(name) {
       return name ? name.slice(0, 2) : '饭'
     },
+    resultImage(result) {
+      const image = result && result.images && result.images.length ? result.images[0] : result.coverImageUrl
+      return assetUrl(image)
+    },
     async skip() {
       if (!this.requireLogin()) return
       try {
@@ -179,7 +185,7 @@ export default {
           uni.showToast({ title: '已取消收藏', icon: 'success' })
           return
         }
-        const data = await createFavorite(this.result.sourceId)
+        const data = await createFavorite(this.result.sourceId, this.targetType(this.result))
         this.resultFavorite = { isFavorite: true, id: data.id }
         if (this.result.recordId) {
           await recordLotteryAction(this.result.recordId, 'FAVORITE')
@@ -195,14 +201,13 @@ export default {
         return
       }
       try {
-        const state = await checkFavorite(this.result.sourceId)
+        const targetType = this.targetType(this.result)
+        const state = await checkFavorite(this.result.sourceId, targetType)
         let favoriteId = state.favoriteId || null
-        if (state.isFavorite) {
-          if (!favoriteId) {
-            const page = await fetchFavorites({ size: 50 })
-            const matched = (page.records || []).find((item) => String(item.targetId) === String(this.result.sourceId))
-            favoriteId = matched ? matched.id : null
-          }
+        if (state.isFavorite && !favoriteId) {
+          const page = await fetchFavorites({ targetType, size: 50 })
+          const matched = (page.records || []).find((item) => String(item.targetId) === String(this.result.sourceId))
+          favoriteId = matched ? matched.id : null
         }
         this.resultFavorite = { isFavorite: !!state.isFavorite, id: favoriteId }
       } catch (error) {
@@ -212,6 +217,11 @@ export default {
     async accept() {
       if (!this.requireLogin()) return
       try {
+        if (this.result.sourceType === 'POST') {
+          await recordLotteryAction(this.result.recordId, 'ACCEPT')
+          this.goResultDetail()
+          return
+        }
         await createEatList(this.result.sourceId, this.result.recordId)
         await recordLotteryAction(this.result.recordId, 'ACCEPT')
         uni.showToast({ title: '已加入想吃', icon: 'success' })
@@ -220,8 +230,19 @@ export default {
         uni.showToast({ title: error.message || '操作失败', icon: 'none' })
       }
     },
-    goDetail(id) {
+    targetType(item) {
+      return item && item.sourceType === 'POST' ? 'POST' : 'DISH'
+    },
+    goResultDetail() {
+      if (!this.result) return
+      this.goDetail(this.result.sourceId, this.result.sourceType)
+    },
+    goDetail(id, sourceType = 'DISH') {
       if (!id) return
+      if (sourceType === 'POST') {
+        uni.navigateTo({ url: `/pages/post-detail/index?id=${id}` })
+        return
+      }
       uni.navigateTo({ url: `/pages/dish-detail/index?id=${id}` })
     },
     actionText(action) {
@@ -373,6 +394,20 @@ export default {
   color: #fffdf7;
   font-size: 58rpx;
   font-weight: 900;
+}
+
+.result-art image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.result-art text {
+  position: relative;
+  z-index: 1;
 }
 
 .result-info {

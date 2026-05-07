@@ -2,6 +2,7 @@ package com.eatnow.backend.campus.service;
 
 import com.eatnow.backend.campus.mapper.CanteenMapper;
 import com.eatnow.backend.campus.mapper.StallMapper;
+import com.eatnow.backend.campus.vo.CampusPlaceSearchVo;
 import com.eatnow.backend.campus.vo.CanteenDetailVo;
 import com.eatnow.backend.campus.vo.CanteenListVo;
 import com.eatnow.backend.campus.vo.StallDetailVo;
@@ -19,6 +20,8 @@ import java.util.List;
 public class CampusQueryService {
 
     private static final String DEFAULT_OPEN_STATUS = "OPEN";
+    private static final int DEFAULT_SEARCH_LIMIT = 8;
+    private static final int MAX_SEARCH_LIMIT = 20;
 
     private final CanteenMapper canteenMapper;
     private final StallMapper stallMapper;
@@ -35,6 +38,18 @@ public class CampusQueryService {
         return detail;
     }
 
+    public List<CampusPlaceSearchVo> searchPlaces(String keyword, Integer limit) {
+        String normalizedKeyword = trimToNull(keyword);
+        if (normalizedKeyword == null) {
+            return List.of();
+        }
+        return canteenMapper.selectPlaceSearchResults(
+                normalizedKeyword,
+                DEFAULT_OPEN_STATUS,
+                normalizeSearchLimit(limit)
+        );
+    }
+
     public List<StallListVo> listStalls(Long canteenId, String status) {
         return stallMapper.selectStallList(canteenId, resolveStatus(status));
     }
@@ -49,5 +64,19 @@ public class CampusQueryService {
 
     private String resolveStatus(String status) {
         return StringUtils.hasText(status) ? status : DEFAULT_OPEN_STATUS;
+    }
+
+    private int normalizeSearchLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return DEFAULT_SEARCH_LIMIT;
+        }
+        return Math.min(limit, MAX_SEARCH_LIMIT);
+    }
+
+    private String trimToNull(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
     }
 }

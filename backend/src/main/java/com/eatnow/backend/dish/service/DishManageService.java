@@ -50,6 +50,7 @@ public class DishManageService {
     private static final String DISH_STATUS_ON_SALE = "ON_SALE";
     private static final String DISH_STATUS_SOLD_OUT = "SOLD_OUT";
     private static final String DISH_STATUS_OFF_SHELF = "OFF_SHELF";
+    private static final String DISH_STATUS_DELETED = "DELETED";
     private static final String LOTTERY_POOL_STATUS_INACTIVE = "INACTIVE";
 
     private final DishMapper dishMapper;
@@ -152,7 +153,7 @@ public class DishManageService {
                 null,
                 new LambdaUpdateWrapper<Dish>()
                         .eq(Dish::getId, dishId)
-                        .set(Dish::getStatus, DISH_STATUS_OFF_SHELF)
+                        .set(Dish::getStatus, DISH_STATUS_DELETED)
         );
         dishMapper.updateDishLotteryPoolStatus(dishId, LOTTERY_POOL_STATUS_INACTIVE);
     }
@@ -215,13 +216,17 @@ public class DishManageService {
         if (!merchantId.equals(dish.getMerchantId())) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "No permission to manage this dish");
         }
+        if (DISH_STATUS_DELETED.equals(dish.getStatus())) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "Dish not found");
+        }
         return dish;
     }
 
     private void ensureDishNameAvailable(Long merchantId, String name, Long excludingDishId) {
         LambdaQueryWrapper<Dish> wrapper = new LambdaQueryWrapper<Dish>()
                 .eq(Dish::getMerchantId, merchantId)
-                .eq(Dish::getName, name);
+                .eq(Dish::getName, name)
+                .ne(Dish::getStatus, DISH_STATUS_DELETED);
         if (excludingDishId != null) {
             wrapper.ne(Dish::getId, excludingDishId);
         }

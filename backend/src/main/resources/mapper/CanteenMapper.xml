@@ -24,6 +24,85 @@
         ORDER BY c.sort_order ASC, c.id ASC
     </select>
 
+    <select id="selectPlaceSearchResults" resultType="com.eatnow.backend.campus.vo.CampusPlaceSearchVo">
+        SELECT
+            placeType,
+            id,
+            canteenId,
+            stallId,
+            name,
+            canteenName,
+            canteenType,
+            location,
+            description,
+            merchantName
+        FROM (
+            SELECT
+                'CANTEEN' AS placeType,
+                c.id AS id,
+                c.id AS canteenId,
+                NULL AS stallId,
+                c.name AS name,
+                c.name AS canteenName,
+                c.type AS canteenType,
+                c.location AS location,
+                c.description AS description,
+                NULL AS merchantName,
+                c.sort_order AS canteenSortOrder,
+                0 AS stallSortOrder,
+                CASE
+                    WHEN c.name = #{keyword} THEN 0
+                    WHEN c.name LIKE CONCAT(#{keyword}, '%') THEN 1
+                    ELSE 4
+                END AS matchRank
+            FROM canteen c
+            WHERE c.status = #{status}
+              AND (
+                  c.name LIKE CONCAT('%', #{keyword}, '%')
+                  OR c.location LIKE CONCAT('%', #{keyword}, '%')
+                  OR c.description LIKE CONCAT('%', #{keyword}, '%')
+              )
+            UNION ALL
+            SELECT
+                'STALL' AS placeType,
+                s.id AS id,
+                c.id AS canteenId,
+                s.id AS stallId,
+                s.name AS name,
+                c.name AS canteenName,
+                c.type AS canteenType,
+                s.location AS location,
+                s.description AS description,
+                m.name AS merchantName,
+                c.sort_order AS canteenSortOrder,
+                s.sort_order AS stallSortOrder,
+                CASE
+                    WHEN s.name = #{keyword} THEN 0
+                    WHEN s.name LIKE CONCAT(#{keyword}, '%') THEN 1
+                    WHEN c.name LIKE CONCAT(#{keyword}, '%') THEN 2
+                    WHEN m.name LIKE CONCAT(#{keyword}, '%') THEN 3
+                    ELSE 4
+                END AS matchRank
+            FROM stall s
+            INNER JOIN canteen c ON c.id = s.canteen_id
+            LEFT JOIN merchant m
+                ON m.stall_id = s.id
+               AND m.apply_status = 'APPROVED'
+               AND m.status = #{status}
+            WHERE s.status = #{status}
+              AND c.status = #{status}
+              AND (
+                  s.name LIKE CONCAT('%', #{keyword}, '%')
+                  OR s.location LIKE CONCAT('%', #{keyword}, '%')
+                  OR s.description LIKE CONCAT('%', #{keyword}, '%')
+                  OR c.name LIKE CONCAT('%', #{keyword}, '%')
+                  OR m.name LIKE CONCAT('%', #{keyword}, '%')
+              )
+        ) places
+        ORDER BY matchRank ASC, canteenSortOrder ASC, stallSortOrder ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
     <select id="selectCanteenDetail" resultType="com.eatnow.backend.campus.vo.CanteenDetailVo">
         SELECT
             c.id,

@@ -23,9 +23,13 @@
   }
 
   button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin: 0;
     padding: 0;
     line-height: 1;
+    text-align: center;
     border-radius: 0;
     background: transparent;
   }
@@ -131,5 +135,57 @@
     color: #9d8466;
     text-align: center;
     font-size: 26rpx;
+  }
+
+  .search-icon,
+  .quick-mark,
+  .rank-no,
+  .canteen-badge,
+  .avatar,
+  .post-btn,
+  .search-btn,
+  .add-btn,
+  .sort-chip,
+  .filter,
+  .type-tab,
+  .tab,
+  .small-action,
+  .notice-badge,
+  .status-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .search-icon {
+    position: relative;
+    flex: 0 0 34rpx;
+    width: 34rpx;
+    height: 34rpx;
+    margin-right: 12rpx;
+    font-size: 0;
+    line-height: 1;
+  }
+
+  .search-icon::before {
+    content: "";
+    width: 18rpx;
+    height: 18rpx;
+    border: 4rpx solid #e94b35;
+    border-radius: 50%;
+  }
+
+  .search-icon::after {
+    content: "";
+    position: absolute;
+    right: 4rpx;
+    bottom: 4rpx;
+    width: 12rpx;
+    height: 4rpx;
+    border-radius: 999rpx;
+    background: #e94b35;
+    transform: rotate(45deg);
+    transform-origin: center;
   }
 </style>

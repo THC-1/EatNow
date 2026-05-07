@@ -19,6 +19,7 @@ public class DishQueryRequest {
     private BigDecimal minScore;
     private String keyword;
     private String status;
+    private Boolean manage;
 
     @Min(value = 1, message = "page must be greater than or equal to 1")
     private Integer page = 1;

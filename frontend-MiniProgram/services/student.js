@@ -54,6 +54,10 @@ export function fetchStalls(canteenId) {
   return request({ url: '/api/v1/stalls', params: { canteenId } })
 }
 
+export function searchPlaces(keyword, limit = 8) {
+  return request({ url: '/api/v1/places/search', params: { keyword, limit } })
+}
+
 export function fetchDishes(params = {}) {
   return request({ url: '/api/v1/dishes', params })
 }
@@ -66,16 +70,52 @@ export function fetchReviews(targetId) {
   return request({ url: '/api/v1/reviews', params: { targetType: 'DISH', targetId, page: 1, size: 10 } })
 }
 
-export function createFavorite(targetId) {
-  return request({ url: '/api/v1/favorites', method: 'POST', auth: true, data: { targetType: 'DISH', targetId } })
+export function fetchCategories() {
+  return request({ url: '/api/v1/categories', params: { type: 'DISH' } })
+}
+
+export function fetchTags() {
+  return request({ url: '/api/v1/tags', params: { type: 'TASTE' } })
+}
+
+export function fetchPosts(params = {}) {
+  return request({ url: '/api/v1/posts', params })
+}
+
+export function fetchPostDetail(id) {
+  return request({ url: `/api/v1/posts/${id}` })
+}
+
+export function fetchMyPosts(params = {}) {
+  return request({ url: '/api/v1/posts/me', auth: true, params: { page: 1, size: 10, ...params } })
+}
+
+export function createPost(payload) {
+  return request({ url: '/api/v1/posts', method: 'POST', auth: true, data: payload })
+}
+
+export function deletePost(id) {
+  return request({ url: `/api/v1/posts/${id}`, method: 'DELETE', auth: true })
+}
+
+export function likePost(id) {
+  return request({ url: `/api/v1/posts/${id}/like`, method: 'POST', auth: true })
+}
+
+export function unlikePost(id) {
+  return request({ url: `/api/v1/posts/${id}/like`, method: 'DELETE', auth: true })
+}
+
+export function createFavorite(targetId, targetType = 'DISH') {
+  return request({ url: '/api/v1/favorites', method: 'POST', auth: true, data: { targetType, targetId } })
 }
 
 export function deleteFavorite(id) {
   return request({ url: `/api/v1/favorites/${id}`, method: 'DELETE', auth: true })
 }
 
-export function checkFavorite(targetId) {
-  return request({ url: '/api/v1/favorites/check', auth: true, params: { targetType: 'DISH', targetId } })
+export function checkFavorite(targetId, targetType = 'DISH') {
+  return request({ url: '/api/v1/favorites/check', auth: true, params: { targetType, targetId } })
 }
 
 export function createEatList(dishId, sourceLotteryRecordId = null) {
@@ -107,6 +147,10 @@ export function drawLottery(mode = 'RANDOM', condition = {}) {
   return request({ url: map[mode], method: 'POST', auth: true, data: { drawMode: mode, ...condition } })
 }
 
+export function chatWithLlmRecommendation(payload) {
+  return request({ url: '/api/v1/llm-recommendations/student-chat', method: 'POST', auth: true, data: payload })
+}
+
 export function recordLotteryAction(recordId, resultAction) {
   return request({ url: `/api/v1/lottery/records/${recordId}/action`, method: 'POST', auth: true, data: { resultAction } })
 }
@@ -116,7 +160,7 @@ export function fetchLotteryRecords() {
 }
 
 export function fetchFavorites(params = {}) {
-  return request({ url: '/api/v1/favorites', auth: true, params: { targetType: 'DISH', page: 1, size: 10, ...params } })
+  return request({ url: '/api/v1/favorites', auth: true, params: { page: 1, size: 10, ...params } })
 }
 
 export function fetchEatList(params = {}) {

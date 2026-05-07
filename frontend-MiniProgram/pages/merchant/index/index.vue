@@ -40,6 +40,11 @@
         <text class="quick-title">留言反馈</text>
         <text class="quick-sub">{{ overview.pendingFeedbackCount || 0 }} 条待处理</text>
       </view>
+      <view class="quick-action ai" @tap="goAiRecommend">
+        <text class="quick-mark">AI</text>
+        <text class="quick-title">智能点餐</text>
+        <text class="quick-sub">和学生端同款推荐</text>
+      </view>
     </view>
 
     <view class="section">
@@ -175,6 +180,9 @@ export default {
     },
     goFeedback() {
       uni.navigateTo({ url: '/pages/merchant/feedback/index' })
+    },
+    goAiRecommend() {
+      uni.navigateTo({ url: '/pages/ai-recommend/index' })
     }
   }
 }
@@ -311,7 +319,7 @@ export default {
 
 .quick-panel {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16rpx;
   margin-top: 22rpx;
 }
@@ -337,6 +345,11 @@ export default {
 .quick-action.ink .quick-mark {
   background: #2b2118;
   color: #fffdf7;
+}
+
+.quick-action.ai .quick-mark {
+  background: #ffd64e;
+  color: #241811;
 }
 
 .quick-mark {

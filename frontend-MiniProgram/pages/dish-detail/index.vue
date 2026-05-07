@@ -1,7 +1,8 @@
 <template>
   <view class="page detail-page">
     <view class="cover food-art">
-      <text>{{ shortName(dish.name || '') }}</text>
+      <image v-if="dishImage(dish)" :src="dishImage(dish)" mode="aspectFill" />
+      <text v-else>{{ shortName(dish.name || '') }}</text>
     </view>
 
     <view class="detail-card">
@@ -98,7 +99,7 @@
 
 <script>
 import { checkFavorite, createEatList, createFavorite, createFeedback, createReview, deleteFavorite, fetchDishDetail, fetchFavorites, fetchReviews, uploadStudentImage } from '../../services/student.js'
-import { hasToken } from '../../utils/request.js'
+import { assetUrl, hasToken } from '../../utils/request.js'
 
 export default {
   data() {
@@ -149,7 +150,7 @@ export default {
         let favoriteId = state.favoriteId || null
         if (state.isFavorite) {
           if (!favoriteId) {
-            const page = await fetchFavorites({ size: 50 })
+            const page = await fetchFavorites({ targetType: 'DISH', size: 50 })
             const matched = (page.records || []).find((item) => String(item.targetId) === String(this.id))
             favoriteId = matched ? matched.id : null
           }
@@ -161,6 +162,10 @@ export default {
     },
     shortName(name) {
       return name ? name.slice(0, 2) : '饭'
+    },
+    dishImage(dish) {
+      const image = dish && dish.images && dish.images.length ? dish.images[0] : dish.coverImageUrl
+      return assetUrl(image)
     },
     async favorite() {
       if (!this.requireLogin()) return
@@ -282,6 +287,20 @@ export default {
   font-size: 70rpx;
   font-weight: 900;
   border-radius: 38rpx;
+}
+
+.cover image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cover text {
+  position: relative;
+  z-index: 1;
 }
 
 .detail-card {

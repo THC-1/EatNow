@@ -18,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -47,8 +48,10 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
+                                "/api/v1/posts",
                                 "/api/v1/canteens",
                                 "/api/v1/canteens/*",
+                                "/api/v1/places/search",
                                 "/api/v1/stalls",
                                 "/api/v1/stalls/*",
                                 "/api/v1/merchants",
@@ -62,6 +65,8 @@ public class SecurityConfig {
                                 "/api/v1/tags",
                                 "/uploads/**"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/uploads/**").permitAll()
+                        .requestMatchers(new RegexRequestMatcher("^/api/v1/posts/\\d+$", "GET")).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception

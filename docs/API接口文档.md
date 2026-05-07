@@ -467,7 +467,55 @@
 }
 ```
 
-### 3.3 获取店铺列表
+### 3.3 搜索地点候选
+
+- **接口**: `GET /api/v1/places/search`
+- **描述**: 搜索可绑定到分享帖的地点候选,结果包含商业区/食堂以及店铺/窗口。学生发布分享时可选择候选绑定 `canteenId`/`stallId`;如果没有合适候选,也可以只提交用户填写的 `shopName`。
+- **查询参数**:
+  - `keyword`: 搜索关键词(必填)
+  - `limit`: 返回数量上限(可选,默认 8,最大 20)
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "placeType": "STALL",
+      "id": 10,
+      "canteenId": 1,
+      "stallId": 10,
+      "name": "麻辣烫窗口",
+      "canteenName": "第一食堂",
+      "canteenType": "CANTEEN",
+      "location": "一楼3号",
+      "description": "麻辣烫、冒菜",
+      "merchantName": "张三麻辣烫"
+    },
+    {
+      "placeType": "CANTEEN",
+      "id": 1,
+      "canteenId": 1,
+      "stallId": null,
+      "name": "第一食堂",
+      "canteenName": "第一食堂",
+      "canteenType": "CANTEEN",
+      "location": "校园东区",
+      "description": "主营快餐",
+      "merchantName": null
+    }
+  ]
+}
+```
+
+- **字段说明**:
+  - `placeType`: 候选类型,`CANTEEN` 表示商业区/食堂,`STALL` 表示店铺/窗口
+  - `id`: 候选自身ID;当 `placeType = STALL` 时等于 `stallId`,当 `placeType = CANTEEN` 时等于 `canteenId`
+  - `canteenId`: 绑定到分享帖的商业区ID
+  - `stallId`: 绑定到分享帖的店铺/窗口ID;商业区候选为空
+
+### 3.4 获取店铺列表
 
 - **接口**: `GET /api/v1/stalls`
 - **描述**: 获取店铺列表,可按商业区筛选
@@ -503,7 +551,7 @@
 }
 ```
 
-### 3.4 获取店铺详情
+### 3.5 获取店铺详情
 
 - **接口**: `GET /api/v1/stalls/{id}`
 - **描述**: 获取指定店铺的详细信息
@@ -1687,6 +1735,8 @@
 }
 ```
 
+> `sourceType` 可能为 `DISH` 或 `POST`。当结果来自用户帖子时,`sourceId` 为帖子ID,`title` 为食物名称,`merchantName` 返回用户填写的店铺名称。
+
 ### 13.2 条件抽奖
 
 - **接口**: `POST /api/v1/lottery/draw-with-condition`
@@ -1710,7 +1760,7 @@
 ### 13.3 从收藏中抽奖
 
 - **接口**: `POST /api/v1/lottery/draw-from-favorites`
-- **描述**: 从收藏的菜品中随机抽取
+- **描述**: 从收藏的菜品或帖子中随机抽取
 - **权限**: 学生用户
 - **请求参数**:
 
@@ -2538,16 +2588,177 @@
 
 ---
 
-## 十七、文件上传模块
+## 十七、用户帖子模块
 
-### 17.1 上传图片
+### 17.1 发布帖子
+
+- **接口**: `POST /api/v1/posts`
+- **描述**: 学生发布食物分享帖,可选择加入随机抽奖池
+- **权限**: 学生用户
+- **请求参数**:
+
+```json
+{
+  "foodName": "麻辣烫",
+  "shopName": "一食堂麻辣烫窗口",
+  "content": "汤底很香,配菜也新鲜",
+  "title": "今天这碗麻辣烫不错",
+  "canteenId": 1,
+  "stallId": 2,
+  "categoryId": 3,
+  "price": 18.0,
+  "score": 4.5,
+  "images": ["图片URL1", "图片URL2"],
+  "tagIds": [10, 11],
+  "isJoinLottery": true
+}
+```
+
+- `foodName`、`shopName`、`content` 必填
+- `title` 为空时默认使用 `foodName`
+- `images` 为选填,不传或空数组也可发布
+- `isJoinLottery` 默认为 `false`;为 `true` 时同步进入抽奖池
+
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": 1
+  }
+}
+```
+
+### 17.2 获取帖子列表
+
+- **接口**: `GET /api/v1/posts`
+- **描述**: 获取公开帖子列表
+- **查询参数**:
+  - `keyword`: 关键词(可选)
+  - `canteenId`: 商业区ID(可选)
+  - `stallId`: 店铺ID(可选)
+  - `categoryId`: 分类ID(可选)
+  - `tagId`: 标签ID(可选)
+  - `sortBy`: 排序方式(可选) - `latest`(最新,默认)、`popular`(热门)
+  - `page`: 页码(默认1)
+  - `size`: 每页数量(默认10,最大50)
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [
+      {
+        "id": 1,
+        "userId": 123,
+        "userNickname": "张三",
+        "userAvatar": "头像URL",
+        "title": "今天这碗麻辣烫不错",
+        "foodName": "麻辣烫",
+        "shopName": "一食堂麻辣烫窗口",
+        "content": "汤底很香,配菜也新鲜",
+        "canteenId": 1,
+        "canteenName": "第一食堂",
+        "canteenType": "CANTEEN",
+        "stallId": 2,
+        "stallName": "麻辣烫窗口",
+        "categoryId": 3,
+        "categoryName": "午餐",
+        "price": 18.0,
+        "score": 4.5,
+        "images": ["图片URL1"],
+        "tags": [{"tagId": 10, "tagName": "微辣"}],
+        "isJoinLottery": true,
+        "viewCount": 12,
+        "likeCount": 3,
+        "favoriteCount": 1,
+        "commentCount": 0,
+        "isLiked": false,
+        "createdAt": "2026-05-04T10:00:00"
+      }
+    ],
+    "total": 20,
+    "page": 1,
+    "size": 10
+  }
+}
+```
+
+### 17.3 获取帖子详情
+
+- **接口**: `GET /api/v1/posts/{id}`
+- **描述**: 获取帖子详情,并增加浏览量
+- **路径参数**: `id` - 帖子ID
+- **响应参数**: 同帖子列表单条记录
+
+### 17.4 获取我的帖子
+
+- **接口**: `GET /api/v1/posts/me`
+- **描述**: 获取当前学生发布的帖子列表
+- **权限**: 学生用户
+- **查询参数**:
+  - `page`: 页码(默认1)
+  - `size`: 每页数量(默认10,最大50)
+- **响应参数**: 同帖子列表
+
+### 17.5 删除帖子
+
+- **接口**: `DELETE /api/v1/posts/{id}`
+- **描述**: 删除帖子(作者可删除自己的帖子,管理员可删除任意帖子)
+- **权限**: 学生用户或管理员
+- **路径参数**: `id` - 帖子ID
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+### 17.6 点赞帖子
+
+- **接口**: `POST /api/v1/posts/{id}/like`
+- **描述**: 点赞帖子,重复点赞不会重复计数
+- **权限**: 学生用户
+- **路径参数**: `id` - 帖子ID
+- **响应参数**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "likeCount": 4
+  }
+}
+```
+
+### 17.7 取消点赞帖子
+
+- **接口**: `DELETE /api/v1/posts/{id}/like`
+- **描述**: 取消点赞帖子
+- **权限**: 学生用户
+- **路径参数**: `id` - 帖子ID
+- **响应参数**: 同点赞帖子
+
+---
+
+## 十八、文件上传模块
+
+### 18.1 上传图片
 
 - **接口**: `POST /api/v1/files/upload-image`
 - **描述**: 上传图片文件
 - **权限**: 登录用户
 - **请求参数**: `multipart/form-data`
   - `file`: 图片文件
-  - `type`: 图片类型(可选) - `avatar`、`dish`、`review`、`merchant-logo`
+  - `type`: 图片类型(可选) - `avatar`、`dish`、`review`、`post`、`merchant-logo`
 - **响应参数**:
 
 ```json
@@ -2575,7 +2786,20 @@
 - `CAMPUS_SHOP`: 校内店铺(不属于食堂但在校园内)
 - `PERIPHERY_SHOP`: 校园周边店铺(不在校园内)
 
-### 商家申请状态
+### 商家申请状态USE eatnow;
+
+-- One-time upgrade for existing databases created before user post publishing APIs.
+-- Fresh databases already get these columns from 04_student_content.sql.
+
+UPDATE student_post
+SET dish_name = title
+WHERE dish_name IS NULL OR dish_name = '';
+
+ALTER TABLE student_post
+  MODIFY dish_name VARCHAR(128) NOT NULL COMMENT 'Shared dish/food name',
+  ADD COLUMN shop_name VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'User entered shop/stall name' AFTER dish_name,
+  ADD COLUMN is_join_lottery TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Whether join lottery pool' AFTER score;
+
 
 - `PENDING`: 待审核
 - `APPROVED`: 已通过
@@ -2636,6 +2860,11 @@
 
 - `DISH`: 商家菜品
 - `POST`: 学生分享
+
+### 帖子状态
+
+- `PUBLISHED`: 已发布
+- `DELETED`: 已删除
 
 ### 改进记录状态
 

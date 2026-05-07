@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { Eye, RotateCcw, Search } from 'lucide-vue-next'
+import { CheckCircle2, Eye, RotateCcw, Search, XCircle } from 'lucide-vue-next'
 import LoadingState from '@/components/LoadingState.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import PageShell from '@/components/PageShell.vue'
@@ -67,14 +67,19 @@ async function reset() {
   search()
 }
 
+function showPending() {
+  filters.status = 'PENDING'
+  page.value = 1
+  load()
+}
+
 async function openDetail(item) {
   detail.value = await api.dishDetail(item.id)
   detailOpen.value = true
 }
 
-async function changeStatus(item, event) {
+async function changeStatusTo(item, next) {
   const previous = item.status
-  const next = event.target.value
   item.status = next
   try {
     await api.updateDishStatus(item.id, next)
@@ -82,6 +87,10 @@ async function changeStatus(item, event) {
     item.status = previous
     error.value = exception.message
   }
+}
+
+async function changeStatus(item, event) {
+  await changeStatusTo(item, event.target.value)
 }
 
 onMounted(async () => {
@@ -112,6 +121,7 @@ onMounted(async () => {
       <input v-model="filters.keyword" placeholder="搜索菜品名称" />
       <button class="primary-button" type="submit"><Search :size="16" />搜索</button>
       <button class="secondary-button" type="button" @click="reset"><RotateCcw :size="16" />重置</button>
+      <button class="secondary-button" type="button" @click="showPending">待审核</button>
     </form>
 
     <LoadingState :loading="loading" :error="error" :empty="!records.length">
@@ -156,6 +166,22 @@ onMounted(async () => {
               <td>{{ item.viewCount || 0 }} 浏览 · {{ item.reviewCount || 0 }} 评</td>
               <td>
                 <button class="text-button" type="button" @click="openDetail(item)"><Eye :size="15" />详情</button>
+                <button
+                  v-if="item.status === 'PENDING'"
+                  class="text-button approve"
+                  type="button"
+                  @click="changeStatusTo(item, 'ON_SALE')"
+                >
+                  <CheckCircle2 :size="15" />通过上架
+                </button>
+                <button
+                  v-if="item.status === 'PENDING'"
+                  class="text-button reject"
+                  type="button"
+                  @click="changeStatusTo(item, 'OFF_SHELF')"
+                >
+                  <XCircle :size="15" />下架
+                </button>
               </td>
             </tr>
           </tbody>

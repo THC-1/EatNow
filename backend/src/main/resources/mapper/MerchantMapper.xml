@@ -175,4 +175,229 @@
         ORDER BY feedbackCount DESC, pendingFeedbackCount DESC, d.id DESC
         LIMIT #{limit}
     </select>
+
+    <select id="selectMerchantDailyMetrics" resultType="com.eatnow.backend.llmrecommendation.vo.MerchantDailyMetricsVo">
+        SELECT
+            (
+                SELECT COUNT(1)
+                FROM review r
+                INNER JOIN dish d ON d.id = r.dish_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND r.status = 'VISIBLE'
+                  AND r.created_at &gt;= #{startTime}
+                  AND r.created_at &lt; #{endTime}
+            ) AS todayReviewCount,
+            (
+                SELECT COALESCE(ROUND(AVG(r.overall_score), 2), 0)
+                FROM review r
+                INNER JOIN dish d ON d.id = r.dish_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND r.status = 'VISIBLE'
+                  AND r.created_at &gt;= #{startTime}
+                  AND r.created_at &lt; #{endTime}
+            ) AS todayAverageScore,
+            (
+                SELECT COALESCE(ROUND(AVG(r.taste_score), 2), 0)
+                FROM review r
+                INNER JOIN dish d ON d.id = r.dish_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND r.status = 'VISIBLE'
+                  AND r.created_at &gt;= #{startTime}
+                  AND r.created_at &lt; #{endTime}
+            ) AS todayTasteScore,
+            (
+                SELECT COALESCE(ROUND(AVG(r.portion_score), 2), 0)
+                FROM review r
+                INNER JOIN dish d ON d.id = r.dish_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND r.status = 'VISIBLE'
+                  AND r.created_at &gt;= #{startTime}
+                  AND r.created_at &lt; #{endTime}
+            ) AS todayPortionScore,
+            (
+                SELECT COALESCE(ROUND(AVG(r.value_score), 2), 0)
+                FROM review r
+                INNER JOIN dish d ON d.id = r.dish_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND r.status = 'VISIBLE'
+                  AND r.created_at &gt;= #{startTime}
+                  AND r.created_at &lt; #{endTime}
+            ) AS todayValueScore,
+            (
+                SELECT COUNT(1)
+                FROM feedback f
+                WHERE f.merchant_id = #{merchantId}
+                  AND f.created_at &gt;= #{startTime}
+                  AND f.created_at &lt; #{endTime}
+            ) AS todayFeedbackCount,
+            (
+                SELECT COUNT(1)
+                FROM feedback f
+                WHERE f.merchant_id = #{merchantId}
+                  AND f.status = 'PENDING'
+                  AND f.created_at &gt;= #{startTime}
+                  AND f.created_at &lt; #{endTime}
+            ) AS todayNewPendingFeedbackCount,
+            (
+                SELECT COUNT(1)
+                FROM feedback f
+                WHERE f.merchant_id = #{merchantId}
+                  AND f.status = 'PENDING'
+            ) AS totalPendingFeedbackCount,
+            (
+                SELECT COUNT(1)
+                FROM favorite fav
+                INNER JOIN dish d ON d.id = fav.target_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND fav.target_type = 'DISH'
+                  AND fav.created_at &gt;= #{startTime}
+                  AND fav.created_at &lt; #{endTime}
+            ) AS todayFavoriteCount,
+            (
+                SELECT COUNT(1)
+                FROM eat_list el
+                INNER JOIN dish d ON d.id = el.dish_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND el.created_at &gt;= #{startTime}
+                  AND el.created_at &lt; #{endTime}
+            ) AS todayWantEatCount,
+            (
+                SELECT COUNT(1)
+                FROM eat_list el
+                INNER JOIN dish d ON d.id = el.dish_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND el.eaten_at &gt;= #{startTime}
+                  AND el.eaten_at &lt; #{endTime}
+            ) AS todayEatenCount,
+            (
+                SELECT COUNT(1)
+                FROM lottery_record lr
+                INNER JOIN dish d ON d.id = lr.source_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND lr.source_type = 'DISH'
+                  AND lr.created_at &gt;= #{startTime}
+                  AND lr.created_at &lt; #{endTime}
+            ) AS todayLotteryCount,
+            (
+                SELECT COUNT(1)
+                FROM lottery_record lr
+                INNER JOIN dish d ON d.id = lr.source_id
+                WHERE d.merchant_id = #{merchantId}
+                  AND lr.source_type = 'DISH'
+                  AND lr.result_action IN ('ACCEPT', 'FAVORITE')
+                  AND lr.created_at &gt;= #{startTime}
+                  AND lr.created_at &lt; #{endTime}
+            ) AS todayAcceptedLotteryCount,
+            (
+                SELECT COUNT(1)
+                FROM merchant_recommendation mr
+                WHERE mr.merchant_id = #{merchantId}
+                  AND mr.status = 'ACTIVE'
+                  AND mr.start_time &lt; NOW()
+                  AND mr.end_time &gt;= NOW()
+            ) AS activeRecommendationCount,
+            (
+                SELECT COALESCE(SUM(mr.click_count), 0)
+                FROM merchant_recommendation mr
+                WHERE mr.merchant_id = #{merchantId}
+                  AND mr.status = 'ACTIVE'
+                  AND mr.start_time &lt; DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+                  AND mr.end_time &gt;= CURDATE()
+            ) AS todayRecommendClickCount
+    </select>
+
+    <select id="selectMerchantDailyDishMetrics" resultType="com.eatnow.backend.llmrecommendation.vo.MerchantDailyDishMetricVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            d.status,
+            d.price,
+            d.average_score AS averageScore,
+            d.view_count AS viewCount,
+            d.favorite_count AS favoriteCount,
+            d.review_count AS reviewCount,
+            (
+                SELECT COUNT(1)
+                FROM review r
+                WHERE r.dish_id = d.id
+                  AND r.status = 'VISIBLE'
+                  AND r.created_at &gt;= #{startTime}
+                  AND r.created_at &lt; #{endTime}
+            ) AS todayReviewCount,
+            (
+                SELECT COUNT(1)
+                FROM feedback f
+                WHERE f.dish_id = d.id
+                  AND f.created_at &gt;= #{startTime}
+                  AND f.created_at &lt; #{endTime}
+            ) AS todayFeedbackCount,
+            (
+                SELECT COUNT(1)
+                FROM favorite fav
+                WHERE fav.target_id = d.id
+                  AND fav.target_type = 'DISH'
+                  AND fav.created_at &gt;= #{startTime}
+                  AND fav.created_at &lt; #{endTime}
+            ) AS todayFavoriteCount,
+            (
+                SELECT COUNT(1)
+                FROM eat_list el
+                WHERE el.dish_id = d.id
+                  AND el.created_at &gt;= #{startTime}
+                  AND el.created_at &lt; #{endTime}
+            ) AS todayWantEatCount,
+            (
+                SELECT COUNT(1)
+                FROM lottery_record lr
+                WHERE lr.source_id = d.id
+                  AND lr.source_type = 'DISH'
+                  AND lr.created_at &gt;= #{startTime}
+                  AND lr.created_at &lt; #{endTime}
+            ) AS todayLotteryCount
+        FROM dish d
+        WHERE d.merchant_id = #{merchantId}
+        ORDER BY (todayFavoriteCount * 3 + todayReviewCount * 2 + todayFeedbackCount + todayWantEatCount + todayLotteryCount) DESC,
+                 (d.view_count + d.favorite_count * 3 + d.review_count * 2) DESC,
+                 d.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectMerchantDailyReviewSamples" resultType="com.eatnow.backend.llmrecommendation.vo.MerchantDailyReviewSampleVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            r.overall_score AS overallScore,
+            r.taste_score AS tasteScore,
+            r.portion_score AS portionScore,
+            r.value_score AS valueScore,
+            r.content,
+            r.created_at AS createdAt
+        FROM review r
+        INNER JOIN dish d ON d.id = r.dish_id
+        WHERE d.merchant_id = #{merchantId}
+          AND r.status = 'VISIBLE'
+          AND r.created_at &gt;= #{startTime}
+          AND r.created_at &lt; #{endTime}
+          AND r.content IS NOT NULL
+          AND r.content != ''
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectMerchantDailyFeedbackSamples" resultType="com.eatnow.backend.llmrecommendation.vo.MerchantDailyFeedbackSampleVo">
+        SELECT
+            d.id AS dishId,
+            d.name AS dishName,
+            f.feedback_type AS feedbackType,
+            f.status,
+            f.content,
+            f.created_at AS createdAt
+        FROM feedback f
+        INNER JOIN dish d ON d.id = f.dish_id
+        WHERE f.merchant_id = #{merchantId}
+          AND f.created_at &gt;= #{startTime}
+          AND f.created_at &lt; #{endTime}
+        ORDER BY f.created_at DESC, f.id DESC
+        LIMIT #{limit}
+    </select>
 </mapper>

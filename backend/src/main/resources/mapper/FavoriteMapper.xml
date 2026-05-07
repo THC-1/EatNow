@@ -4,26 +4,44 @@
 
     <select id="countFavorites" resultType="long">
         SELECT COUNT(1)
-        FROM favorite
-        WHERE user_id = #{userId}
+        FROM favorite f
+        WHERE f.user_id = #{userId}
         <if test="targetType != null and targetType != ''">
-            AND target_type = #{targetType}
+            AND f.target_type = #{targetType}
         </if>
+          AND (
+              f.target_type != 'POST'
+              OR EXISTS (
+                  SELECT 1
+                  FROM student_post sp
+                  WHERE sp.id = f.target_id
+                    AND sp.status = 'PUBLISHED'
+              )
+          )
     </select>
 
     <select id="selectFavoriteList" resultType="com.eatnow.backend.favorite.vo.FavoriteItemVo">
         SELECT
-            id,
-            user_id AS userId,
-            target_type AS targetType,
-            target_id AS targetId,
-            created_at AS createdAt
-        FROM favorite
-        WHERE user_id = #{userId}
+            f.id,
+            f.user_id AS userId,
+            f.target_type AS targetType,
+            f.target_id AS targetId,
+            f.created_at AS createdAt
+        FROM favorite f
+        WHERE f.user_id = #{userId}
         <if test="targetType != null and targetType != ''">
-            AND target_type = #{targetType}
+            AND f.target_type = #{targetType}
         </if>
-        ORDER BY id DESC
+          AND (
+              f.target_type != 'POST'
+              OR EXISTS (
+                  SELECT 1
+                  FROM student_post sp
+                  WHERE sp.id = f.target_id
+                    AND sp.status = 'PUBLISHED'
+              )
+          )
+        ORDER BY f.id DESC
         LIMIT #{offset}, #{size}
     </select>
 
@@ -57,6 +75,7 @@
         <foreach collection="postIds" item="postId" open="(" separator="," close=")">
             #{postId}
         </foreach>
+          AND sp.status = 'PUBLISHED'
         ORDER BY sp.id ASC, spi.sort_order ASC, spi.id ASC
     </select>
 

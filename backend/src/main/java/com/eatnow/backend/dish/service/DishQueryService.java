@@ -1,7 +1,10 @@
 package com.eatnow.backend.dish.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.eatnow.backend.common.enums.RoleCode;
 import com.eatnow.backend.common.exception.BusinessException;
 import com.eatnow.backend.common.result.PageResult;
+import com.eatnow.backend.common.utils.SecurityUtils;
 import com.eatnow.backend.dish.dto.DishQueryRequest;
 import com.eatnow.backend.dish.mapper.CategoryMapper;
 import com.eatnow.backend.dish.mapper.DishMapper;
@@ -13,6 +16,8 @@ import com.eatnow.backend.dish.vo.DishListVo;
 import com.eatnow.backend.dish.vo.DishTagRelationVo;
 import com.eatnow.backend.dish.vo.DishTagVo;
 import com.eatnow.backend.dish.vo.TagVo;
+import com.eatnow.backend.merchant.entity.Merchant;
+import com.eatnow.backend.merchant.mapper.MerchantMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +39,7 @@ public class DishQueryService {
     private final DishMapper dishMapper;
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
+    private final MerchantMapper merchantMapper;
 
     public PageResult<DishListVo> listDishes(DishQueryRequest query) {
         DishQueryRequest normalizedQuery = normalizeQuery(query);
@@ -96,9 +102,26 @@ public class DishQueryService {
         normalized.setMinScore(query.getMinScore());
         normalized.setKeyword(StringUtils.hasText(query.getKeyword()) ? query.getKeyword().trim() : null);
         normalized.setStatus(StringUtils.hasText(query.getStatus()) ? query.getStatus().trim() : null);
+        normalized.setManage(Boolean.TRUE.equals(query.getManage()));
+        if (Boolean.TRUE.equals(normalized.getManage())) {
+            normalized.setMerchantId(getCurrentMerchantId());
+        }
         normalized.setPage(query.getPage() == null ? 1 : query.getPage());
         normalized.setSize(query.getSize() == null ? 10 : query.getSize());
         return normalized;
+    }
+
+    private Long getCurrentMerchantId() {
+        SecurityUtils.requireRole(RoleCode.MERCHANT);
+        Merchant merchant = merchantMapper.selectOne(
+                new LambdaQueryWrapper<Merchant>()
+                        .eq(Merchant::getUserId, SecurityUtils.getCurrentUserId())
+                        .last("LIMIT 1")
+        );
+        if (merchant == null) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "Merchant not found");
+        }
+        return merchant.getId();
     }
 
     private void decorateDishList(List<DishListVo> records) {

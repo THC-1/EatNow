@@ -15,6 +15,7 @@
           AND m.status = 'OPEN'
           AND s.status = 'OPEN'
           AND c.status = 'OPEN'
+          AND d.status != 'DELETED'
         <if test="query.canteenId != null">
             AND d.canteen_id = #{query.canteenId}
         </if>
@@ -49,10 +50,22 @@
         </if>
         <choose>
             <when test="query.status != null and query.status != ''">
-                AND d.status = #{query.status}
+                <choose>
+                    <when test="query.manage == true">
+                        AND d.status = #{query.status}
+                    </when>
+                    <when test="query.status == 'ON_SALE' or query.status == 'SOLD_OUT'">
+                        AND d.status = #{query.status}
+                    </when>
+                    <otherwise>
+                        AND 1 = 0
+                    </otherwise>
+                </choose>
             </when>
             <otherwise>
-                AND d.status IN ('ON_SALE', 'SOLD_OUT')
+                <if test="query.manage != true">
+                    AND d.status IN ('ON_SALE', 'SOLD_OUT')
+                </if>
             </otherwise>
         </choose>
     </sql>

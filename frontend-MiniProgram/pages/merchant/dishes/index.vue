@@ -49,6 +49,7 @@
         <text class="label">图片</text>
         <view class="image-row">
           <view v-for="(image, index) in form.images" :key="image" class="image-chip">
+            <image :src="imageUrl(image)" mode="aspectFill" />
             <text>图{{ index + 1 }}</text>
             <text @tap="removeImage(index)">删除</text>
           </view>
@@ -65,7 +66,8 @@
     <view class="dish-list">
       <view v-for="dish in dishes" :key="dish.id" class="dish-card">
         <view class="food-art dish-art">
-          <text>{{ shortName(dish.name) }}</text>
+          <image v-if="dishImage(dish)" :src="dishImage(dish)" mode="aspectFill" />
+          <text v-else>{{ shortName(dish.name) }}</text>
         </view>
         <view class="dish-body">
           <view class="dish-head">
@@ -82,6 +84,7 @@
             <button @tap="changeStatus(dish, 'ON_SALE')">上架</button>
             <button @tap="changeStatus(dish, 'SOLD_OUT')">售罄</button>
             <button @tap="changeStatus(dish, 'OFF_SHELF')">下架</button>
+            <button class="danger-btn" @tap="removeDish(dish)">删除</button>
           </view>
         </view>
       </view>
@@ -92,7 +95,8 @@
 </template>
 
 <script>
-import { createDish, fetchCategories, fetchMerchantDishes, fetchTags, updateDish, updateDishStatus, uploadMerchantImage } from '../../../services/merchant.js'
+import { createDish, deleteDish, fetchCategories, fetchMerchantDishes, fetchTags, updateDish, updateDishStatus, uploadMerchantImage } from '../../../services/merchant.js'
+import { assetUrl } from '../../../utils/request.js'
 
 function emptyForm() {
   return {
@@ -118,6 +122,7 @@ export default {
       form: emptyForm(),
       statusFilters: [
         { label: '全部', value: '' },
+        { label: '待审核', value: 'PENDING' },
         { label: '上架', value: 'ON_SALE' },
         { label: '售罄', value: 'SOLD_OUT' },
         { label: '下架', value: 'OFF_SHELF' }
@@ -243,8 +248,38 @@ export default {
       uni.showToast({ title: status === 'ON_SALE' ? '已上架' : '状态已更新', icon: 'success' })
       this.loadDishes()
     },
+    removeDish(dish) {
+      uni.showModal({
+        title: '删除菜品',
+        content: `确认删除“${dish.name}”吗？`,
+        confirmText: '删除',
+        confirmColor: '#E94B35',
+        success: async (result) => {
+          if (!result.confirm) {
+            return
+          }
+          try {
+            await deleteDish(dish.id)
+            if (String(this.form.id) === String(dish.id)) {
+              this.cancelEdit()
+            }
+            uni.showToast({ title: '已删除', icon: 'success' })
+            this.loadDishes()
+          } catch (error) {
+            uni.showToast({ title: error.message || '删除失败', icon: 'none' })
+          }
+        }
+      })
+    },
     shortName(name) {
       return name ? name.slice(0, 2) : '菜'
+    },
+    imageUrl(image) {
+      return assetUrl(image)
+    },
+    dishImage(dish) {
+      const image = dish && dish.images && dish.images.length ? dish.images[0] : dish.coverImageUrl
+      return assetUrl(image)
     },
     statusText(status) {
       const map = { ON_SALE: '上架中', SOLD_OUT: '已售罄', OFF_SHELF: '已下架', PENDING: '待审核' }
@@ -433,6 +468,13 @@ export default {
   font-weight: 800;
 }
 
+.image-chip image {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 12rpx;
+  background: #f1e2cb;
+}
+
 .image-chip text:last-child {
   color: #e94b35;
 }
@@ -479,6 +521,20 @@ export default {
   color: #fffdf7;
   font-size: 34rpx;
   font-weight: 900;
+}
+
+.dish-art image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.dish-art text {
+  position: relative;
+  z-index: 1;
 }
 
 .dish-body {
@@ -536,10 +592,11 @@ export default {
 .actions {
   gap: 10rpx;
   margin-top: 14rpx;
+  flex-wrap: wrap;
 }
 
 .actions button {
-  flex: 1;
+  flex: 1 0 104rpx;
   height: 54rpx;
   border-radius: 999rpx;
   background: #fff1d1;
@@ -551,5 +608,10 @@ export default {
 .actions button:first-child {
   background: #2b2118;
   color: #fffdf7;
+}
+
+.actions button.danger-btn {
+  background: #ffe7e1;
+  color: #e94b35;
 }
 </style>
